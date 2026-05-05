@@ -1,0 +1,19 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: rhacs
+  namespace: default
+spec:
+  tasks:
+    # - name: provision-central
+    # - name: authenticate-central
+    # - name: wait-for-scanner-init
+    # - name: run-image-scan
+    # - name: upload-result
+  params:
+    - name: image
+      type: string
+      default: alpine
+  finally:
+    # - name: destroy-ocm
+
