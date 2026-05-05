@@ -15,5 +15,5 @@ spec:
       type: string
       default: alpine
   finally:
-    # - name: destroy-ocm
+    # - name: destroy-central
 
