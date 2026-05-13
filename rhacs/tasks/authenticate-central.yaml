@@ -1,0 +1,77 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: authenticate-central
+  namespace: default
+spec:
+  params:
+    - name: central-id
+      type: string
+    - name: rox-endpoint
+      type: string
+    - name: ocm-token
+      type: string
+  results:
+    - name: rox-api-token
+      type: string
+  stepTemplate:
+    computeResources: {}
+    securityContext:
+      runAsNonRoot: false
+      runAsUser: 0
+  steps:
+    - image: registry.redhat.io/ubi8/ubi-minimal
+      name: install-roxctl
+      script: |
+        #!/bin/sh
+        arch="$(uname -m | sed "s/x86_64//")"; arch="${arch:+-$arch}"
+        curl -L -f -o roxctl "https://mirror.openshift.com/pub/rhacs/assets/4.9.2/bin/Linux/roxctl${arch}"
+        chmod +x roxctl
+      workingDir: $(workspaces.binaries.path)
+    - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
+      name: authenticate-central
+      results:
+      - name: rox-api-token
+        type: string
+      script: |
+        #!/bin/env python
+        import os
+        import time
+        import requests
+
+        ROX_ENDPOINT = os.getenv("ROX_ENDPOINT")
+        OCM_TOKEN = os.getenv("OCM_TOKEN")
+        payload = { "idToken": OCM_TOKEN}
+        response = requests.post(f"{ROX_ENDPOINT}/v1/auth/m2m/exchange", json=payload)
+
+        if response.status_code != 200:
+          print("Failed exchanching OIDC token. Machine to machine authentication may not be configured")
+          response.raise_for_status()
+
+        print("Token exchange successful")
+
+        m2m_response = response.json()
+        with open('$(step.results.rox-api-token.path)', 'w') as f:
+          f.write(m2m_response.get("accessToken"))
+        with open('$(results.rox-api-token.path)', 'w') as f:
+          f.write(m2m_response.get("accessToken"))
+      env:
+        - name: OCM_TOKEN
+          value: $(params.ocm-token)
+        - name: ROX_ENDPOINT
+          value: $(params.rox-endpoint)
+    - image: registry.redhat.io/ubi8/ubi-minimal
+      name: test-rox-api-token
+      script: |
+        #!/bin/sh
+        ./roxctl central whoami
+      env:
+        - name: ROX_API_TOKEN
+          value: $(steps.authenticate-central.results.rox-api-token)
+        - name: ROX_ENDPOINT
+          value: $(params.rox-endpoint)
+      workingDir: $(workspaces.binaries.path)
+  workspaces:
+    - description: |
+        Binaries
+      name: binaries

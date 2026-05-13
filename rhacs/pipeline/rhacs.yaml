@@ -17,7 +17,21 @@ spec:
       workspaces:
         - name: binaries
           workspace: bin
-    # - name: authenticate-central
+    - name: authenticate-central
+      taskRef:
+        kind: Task
+        name: authenticate-central
+      params:
+        - name: central-id
+          value: $(tasks.provision-central.results.central-id)
+        - name: ocm-token
+          value: $(tasks.provision-central.results.ocm-token)
+        - name: rox-endpoint
+          value: $(tasks.provision-central.results.rox-endpoint)
+      workspaces:
+        - name: binaries
+          workspace: bin
+
     # - name: wait-for-scanner-init
     # - name: run-image-scan
     # - name: upload-result

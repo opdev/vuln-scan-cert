@@ -38,6 +38,7 @@ spec:
         #!/bin/sh
         ./ocm login --client-id ${CLIENT_ID} --client-secret ${CLIENT_SECRET}
         printf '%s' "$(./ocm token)" > $(step.results.ocm-token.path)
+        printf '%s' "$(./ocm token)" > $(results.ocm-token.path)
       env:
         - name: CLIENT_ID
           valueFrom:
@@ -126,6 +127,9 @@ spec:
             time.sleep(10)
 
         print("Central is Ready")
+
+        with open('$(results.rox-endpoint.path)', 'w') as f:
+          f.write(central_request.get("centralUIURL"))
       env:
         - name: OCM_TOKEN
           value: $(steps.ocm-login.results.ocm-token)
