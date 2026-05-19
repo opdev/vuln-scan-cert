@@ -46,9 +46,11 @@ spec:
   params:
     - name: image
       type: string
+      description: Image to scan - currently unused
       default: alpine
     - name: cloud-account-id
       type: string
+      description: AWS ID used for Central provisioning via ACS
   finally:
     - name: destroy-central
       taskRef:

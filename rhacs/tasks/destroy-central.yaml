@@ -7,6 +7,7 @@ spec:
   params:
     - name: central-id
       type: string
+      description: ID of provisionned central in ACS
   stepTemplate:
     computeResources: {}
     securityContext:

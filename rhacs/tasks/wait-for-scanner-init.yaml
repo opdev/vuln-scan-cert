@@ -7,6 +7,7 @@ spec:
   params:
     - name: rox-endpoint
       type: string
+      description: Central UI Endpoint
     - name: rox-api-token
       type: string
   stepTemplate:

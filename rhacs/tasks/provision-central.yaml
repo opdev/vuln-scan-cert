@@ -7,12 +7,20 @@ spec:
   params:
     - name: cloud-account-id
       type: string
+      description: AWS ID used for Central provisioning via ACS CS
     - name: pipelinerun-uid
       type: string
+      description: Unique pipelineRun identifier, used to craft a unique Central name.
   results:
     - name: central-id
       type: string
-      description: Name / ID of provisionned central
+      description: ID of provisionned central in ACS CS
+    - name: rox-endpoint
+      type: string
+      description: Central UI Endpoint
+    - name: ocm-token
+      type: string
+      description: Token generated when logging into OCM using Service Account credentials
   stepTemplate:
     computeResources: {}
     securityContext:
@@ -33,7 +41,7 @@ spec:
       results:
       - name: ocm-token
         type: string
-        description: OCM Token
+        description: Token generated when logging into OCM using Service Account credentials
       script: |
         #!/bin/sh
         ./ocm login --client-id ${CLIENT_ID} --client-secret ${CLIENT_SECRET}
@@ -56,7 +64,7 @@ spec:
       results:
         - name: central-id
           type: string
-          description: Central ID returned by OpenShift API on creation
+          description: ID of provisionned central in ACS CS
       env:
         - name: OCM_TOKEN
           value: $(steps.ocm-login.results.ocm-token)

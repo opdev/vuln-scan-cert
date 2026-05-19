@@ -5,15 +5,16 @@ metadata:
   namespace: default
 spec:
   params:
-    - name: central-id
-      type: string
     - name: rox-endpoint
       type: string
+      description: Central UI Endpoint
     - name: ocm-token
       type: string
+      description: Token generated when logging into OCM using Service Account credentials
   results:
     - name: rox-api-token
       type: string
+      description: OIDC Token for ACS authentication, obtained after exchanching the OCM token
   stepTemplate:
     computeResources: {}
     securityContext:
@@ -33,6 +34,7 @@ spec:
       results:
       - name: rox-api-token
         type: string
+        description: OIDC Token for ACS authentication, obtained after exchanching the OCM token
       script: |
         #!/bin/env python
         import os
