@@ -2,7 +2,6 @@ apiVersion: tekton.dev/v1
 kind: Task
 metadata:
   name: wait-for-scanner-init
-  namespace: default
 spec:
   params:
     - name: rox-endpoint

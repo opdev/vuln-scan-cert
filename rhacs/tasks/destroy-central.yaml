@@ -2,7 +2,6 @@ apiVersion: tekton.dev/v1
 kind: Task
 metadata:
   name: destroy-central
-  namespace: default
 spec:
   params:
     - name: central-id

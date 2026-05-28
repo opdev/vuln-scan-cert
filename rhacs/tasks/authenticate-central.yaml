@@ -2,7 +2,6 @@ apiVersion: tekton.dev/v1
 kind: Task
 metadata:
   name: authenticate-central
-  namespace: default
 spec:
   params:
     - name: rox-endpoint

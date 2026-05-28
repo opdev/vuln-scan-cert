@@ -2,7 +2,6 @@ apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
   name: rhacs
-  namespace: default
 spec:
   tasks:
     - name: provision-central
