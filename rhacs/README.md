@@ -76,10 +76,13 @@ $ tkn pipeline start rhacs \
   --param service-account-creds-secret=rh-openid-credentials \
   --param cloud-account-id=$CLOUD_ACCOUNT_ID \
   --param central-aws-region=eu-west-1 \
+  --param destroy-central=true \
   -w name=bin,volumeClaimTemplateFile=./pipeline/pvc-template.yaml
   --pipeline-timeout 2h
   --showlog
 ```
+
+Set `--param destroy-central=false` if you want to keep the deployed Central around for debugging or later use.
 
 ### Apply PipelineRun YAML
 
@@ -104,6 +107,8 @@ spec:
     value: alpine
   - name: service-account-creds-secret
     value: rh-openid-credentials
+  - name: destroy-central
+    value: "true"
   timeouts:
     pipeline: 2h0m0s
   workspaces:

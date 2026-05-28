@@ -69,11 +69,22 @@ spec:
       enum:
         - "eu-west-1"
         - "us-east-1"
+    - name: destroy-central
+      type: string
+      description: Whether to destroy Central in the finally phase
+      default: "true"
+      enum:
+        - "true"
+        - "false"
   finally:
     - name: destroy-central
       taskRef:
         kind: Task
         name: destroy-central
+      when:
+        - input: "$(params.destroy-central)"
+          operator: in
+          values: ["true"]
       params:
         - name: central-id
           value: $(tasks.provision-central.results.central-id)
