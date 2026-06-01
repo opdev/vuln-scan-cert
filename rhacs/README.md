@@ -23,6 +23,20 @@ $ export CLIENT_SECRET=<my-client-secret>
 $ envsubst < rh-openid-credentials/rh-openid-credentials.template.yaml | oc apply -f -
 ```
 
+### Service Account for registry.redhat.io
+
+Test harness images are hosted on registry.redhat.io, for which you need authentication
+- Create a Service Account on: https://access.redhat.com/terms-based-registry/
+- Save the Username and password (token)
+```shell
+$ export REGISTRY_REDHAT_USERNAME=<my_service_account_name>
+$ export REGISTRY_REDHAT_PASSWORD=<my_service_account_token>
+```
+- Create Kubernetes Secret
+```shell
+$ envsubst < registry-redhat-credentials/registry-redhat-credentials.template.yaml | oc apply -f -
+```
+
 ### Apply RHACS Tasks and Pipeline definitions
 
 ```shell
@@ -74,12 +88,13 @@ $ tkn pipeline start rhacs \
   -n default \
   --param image=alpine \
   --param service-account-creds-secret=rh-openid-credentials \
+  --param registry-redhat-creds-secret=registry-redhat-credentials \
   --param cloud-account-id=$CLOUD_ACCOUNT_ID \
   --param central-aws-region=eu-west-1 \
   --param existing-central-id="" \
   --param destroy-central=true \
-  -w name=bin,volumeClaimTemplateFile=./pipeline/pvc-template.yaml
-  --pipeline-timeout 2h
+  -w name=bin,volumeClaimTemplateFile=./pipeline/pvc-template.yaml \
+  --pipeline-timeout 2h \
   --showlog
 ```
 
@@ -110,6 +125,8 @@ spec:
     value: alpine
   - name: service-account-creds-secret
     value: rh-openid-credentials
+  - name: registry-redhat-creds-secret
+    value: registry-redhat-credentials
   - name: existing-central-id
     value: ""
   - name: destroy-central

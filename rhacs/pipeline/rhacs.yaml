@@ -36,6 +36,19 @@ spec:
       workspaces:
         - name: binaries
           workspace: bin
+    - name: configure-central
+      taskRef:
+        kind: Task
+        name: configure-central
+      params:
+        - name: registry-redhat-creds-secret
+          value: $(params.registry-redhat-creds-secret)
+        - name: rox-endpoint
+          value: $(tasks.provision-central.results.rox-endpoint)
+        - name: rox-api-token
+          value: $(tasks.authenticate-central.results.rox-api-token)
+      runAfter:
+        - authenticate-central
     - name: wait-for-scanner-init
       taskRef:
         kind: Task
@@ -46,7 +59,7 @@ spec:
         - name: rox-api-token
           value: $(tasks.authenticate-central.results.rox-api-token)
       runAfter:
-        - authenticate-central
+        - configure-central
         # - name: run-image-scan
         # - name: upload-result
   params:
@@ -58,6 +71,10 @@ spec:
       type: string
       description: Name of Secret containing Service Account credentials
       default: rh-openid-credentials
+    - name: registry-redhat-creds-secret
+      type: string
+      description: Name of Secret containing credentials for registry.redhat.com
+      default: registry-redhat-credentials
     - name: cloud-account-id
       type: string
       description: AWS ID used for Central provisioning via ACS (required when creating a new Central)
