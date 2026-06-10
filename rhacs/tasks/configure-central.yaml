@@ -25,6 +25,7 @@ spec:
           type: string
       script: |
         #!/bin/env python
+        from contextlib import suppress
         import os
         import requests
 
@@ -52,12 +53,21 @@ spec:
         response = requests.post(f"{ROX_ENDPOINT}/v1/imageintegrations", headers=headers, json=payload)
         return_code = response.status_code
 
-        if return_code != 200:
-          print("Failed to add image integration for registry.redhat.io")
-          print(response.text)
-          response.raise_for_status()
+        message = None
+        with suppress(requests.exceptions.JSONDecodeError, AttributeError):
+          # Ignore exceptions that can be raised if the response does not contain valid
+          # JSON, or if it doesn't decode to a dictionary.
+          message = response.json().get("message")
 
-        print("Added image integration for registry.redhat.io")
+        if return_code != 200:
+          if "already exists" in message:
+            print("Central already configured")
+          else:
+            print("Failed to add image integration for registry.redhat.io")
+            print(response.text)
+            response.raise_for_status()
+        else:
+          print("Added image integration for registry.redhat.io")
       env:
         - name: ROX_ENDPOINT
           value: $(params.rox-endpoint)
