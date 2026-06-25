@@ -42,6 +42,7 @@ $ envsubst < registry-redhat-credentials/registry-redhat-credentials.template.ya
 The image scan step uses the Tekton catalog [rhacs-image-scan](https://artifacthub.io/packages/tekton-task/tekton-catalog-tasks/rhacs-image-scan/) task.
 
 ```shell
+$ oc apply -f configmaps/scripts.yaml
 $ oc apply -f tasks/
 $ oc apply -f pipeline/rhacs.yaml
 $ oc apply -f https://github.com/tektoncd/catalog/raw/main/task/rhacs-image-scan/4.0/rhacs-image-scan.yaml

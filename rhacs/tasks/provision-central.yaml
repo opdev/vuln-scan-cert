@@ -38,12 +38,12 @@ spec:
   steps:
     - image: registry.redhat.io/ubi8/ubi-minimal
       name: install-ocm
-      script: |
-        #!/bin/sh
-        # arch="$(uname -m | sed "s/x86_64//")"; arch="${arch:+-$arch}"
-        curl -L -f -o ocm  https://github.com/openshift-online/ocm-cli/releases/download/v1.0.14/ocm-linux-amd64
-        chmod +x ocm
-        ./ocm version
+      command:
+        - /scripts/install-ocm.sh
+      volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+          readOnly: true
       workingDir: $(workspaces.binaries.path)
     - image: registry.redhat.io/ubi8/ubi-minimal
       name: ocm-login
@@ -51,11 +51,12 @@ spec:
         - name: ocm-token
           type: string
           description: Token generated when logging into OCM using Service Account credentials
-      script: |
-        #!/bin/sh
-        ./ocm login --client-id ${CLIENT_ID} --client-secret ${CLIENT_SECRET}
-        printf '%s' "$(./ocm token)" > $(step.results.ocm-token.path)
-        printf '%s' "$(./ocm token)" > $(results.ocm-token.path)
+      command:
+        - /scripts/ocm-login.sh
+      volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+          readOnly: true
       env:
         - name: CLIENT_ID
           valueFrom:
@@ -67,6 +68,10 @@ spec:
             secretKeyRef:
               name: $(params.service-account-creds-secret)
               key: "client-secret"
+        - name: STEP_RESULTS_OCM_TOKEN_PATH
+          value: $(step.results.ocm-token.path)
+        - name: RESULTS_OCM_TOKEN_PATH
+          value: $(results.ocm-token.path)
       workingDir: $(workspaces.binaries.path)
     - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
       name: provision-central
@@ -74,6 +79,13 @@ spec:
         - name: central-id
           type: string
           description: ID of provisionned central in ACS CS
+      command:
+        - python
+        - /scripts/provision-central.py
+      volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+          readOnly: true
       env:
         - name: OCM_TOKEN
           value: $(steps.ocm-login.results.ocm-token)
@@ -85,85 +97,31 @@ spec:
           value: $(params.central-aws-region)
         - name: EXISTING_CENTRAL_ID
           value: $(params.existing-central-id)
-      script: |
-        #!/bin/env python
-        import os
-        import requests
-
-        headers = {"Authorization": "Bearer " + os.getenv("OCM_TOKEN"), "Content-Type": "application/json"}
-        existing_central_id = os.getenv("EXISTING_CENTRAL_ID")
-
-        if existing_central_id:
-          central_id = existing_central_id
-          print(f"Using existing Central with ID {central_id}")
-        else:
-          cloud_account_id = os.getenv("CLOUD_ACCOUNT_ID")
-          if not cloud_account_id:
-            raise ValueError("CLOUD_ACCOUNT_ID must be set when creating a new Central")
-
-          API_URL = "https://api.openshift.com/api/rhacs/v1/centrals?async=true"
-          central_name_suffix = os.getenv("PIPELINERUN_UID").split("-")[0]
-          central_name = f"vuln-scan-cert-{central_name_suffix}"
-          payload = {
-            "name": central_name,
-            "cloud_provider": "aws",
-            "multi_az": True,
-            "region": os.getenv("CENTRAL_AWS_REGION"),
-            "cloud_account_id": cloud_account_id,
-          }
-
-          print(f"Sending Central creation request with name {central_name}")
-
-          response = requests.post(
-            API_URL,
-            json=payload,
-            headers=headers,
-          )
-
-          if response.status_code != 200:
-            print(f"Return code: {response.status_code}")
-            print(response.json())
-            response.raise_for_status()
-
-          central_request = response.json()
-          central_id = central_request.get("id")
-          print("Central creation request successfully sent")
-          print(f"Central ID: {central_id}")
-
-        with open('$(step.results.central-id.path)', 'w') as f:
-          f.write(central_id)
-        with open('$(results.central-id.path)', 'w') as f:
-          f.write(central_id)
+        - name: STEP_RESULTS_CENTRAL_ID_PATH
+          value: $(step.results.central-id.path)
+        - name: RESULTS_CENTRAL_ID_PATH
+          value: $(results.central-id.path)
     - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
       name: wait-for-central-ready
-      script: |
-        #!/bin/env python
-        import os
-        import time
-        import requests
-        headers = {"Authorization": "Bearer " + os.getenv("OCM_TOKEN"), "Content-Type": "application/json"}
-        central_request_status = None
-
-        while central_request_status != "ready":
-          print("Querying central status")
-          response = requests.get(f"https://api.openshift.com/api/rhacs/v1/centrals/{os.getenv("CENTRAL_ID")}", headers=headers)
-          central_request = response.json()
-          print(central_request)
-          central_request_status = central_request.get("status")
-
-          if central_request_status != "ready":
-            print("Central is not ready yet, retrying in 10 seconds...")
-            time.sleep(10)
-
-        print("Central is Ready")
-
-        with open('$(results.rox-endpoint.path)', 'w') as f:
-          f.write(central_request.get("centralUIURL"))
+      command:
+        - python
+        - /scripts/wait-for-central-ready.py
+      volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+          readOnly: true
       env:
         - name: OCM_TOKEN
           value: $(steps.ocm-login.results.ocm-token)
         - name: CENTRAL_ID
           value: $(steps.provision-central.results.central-id)
+        - name: RESULTS_ROX_ENDPOINT_PATH
+          value: $(results.rox-endpoint.path)
+  volumes:
+    - name: scripts
+      configMap:
+        name: provision-central-scripts
+        defaultMode: 0755
   workspaces:
     - description: |
         Binaries

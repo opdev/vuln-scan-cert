@@ -15,12 +15,12 @@ spec:
   steps:
     - image: registry.redhat.io/ubi8/ubi-minimal
       name: install-ocm
-      script: |
-        #!/bin/sh
-        # arch="$(uname -m | sed "s/x86_64//")"; arch="${arch:+-$arch}"
-        curl -L -f -o ocm  https://github.com/openshift-online/ocm-cli/releases/download/v1.0.14/ocm-linux-amd64
-        chmod +x ocm
-        ./ocm version
+      command:
+        - /scripts/install-ocm.sh
+      volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+          readOnly: true
       workingDir: $(workspaces.binaries.path)
     - image: registry.redhat.io/ubi8/ubi-minimal
       name: ocm-login
@@ -28,10 +28,12 @@ spec:
         - name: ocm-token
           type: string
           description: OCM Token
-      script: |
-        #!/bin/sh
-        ./ocm login --client-id ${CLIENT_ID} --client-secret ${CLIENT_SECRET}
-        printf '%s' "$(./ocm token)" > $(step.results.ocm-token.path)
+      command:
+        - /scripts/ocm-login.sh
+      volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+          readOnly: true
       env:
         - name: CLIENT_ID
           valueFrom:
@@ -43,69 +45,42 @@ spec:
             secretKeyRef:
               name: rh-openid-credentials
               key: "client-secret"
+        - name: STEP_RESULTS_OCM_TOKEN_PATH
+          value: $(step.results.ocm-token.path)
       workingDir: $(workspaces.binaries.path)
     - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
       name: destroy-central
+      command:
+        - python
+        - /scripts/destroy-central.py
+      volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+          readOnly: true
       env:
         - name: OCM_TOKEN
           value: $(steps.ocm-login.results.ocm-token)
         - name: CENTRAL_ID
           value: $(params.central-id)
-      script: |
-        #!/bin/env python
-        import os
-        import requests
-
-        ocm_token = os.getenv("OCM_TOKEN")
-        central_id = os.getenv("CENTRAL_ID")
-
-        API_URL = f"https://api.openshift.com/api/rhacs/v1/centrals/{central_id}?async=true"
-        headers = {"Authorization": "Bearer " + ocm_token, "Content-Type": "application/json"}
-
-        print(f"Sending Central deletion request with id {central_id}")
-
-        response = requests.delete(API_URL, headers=headers)
-
-        if response.status_code != 200:
-          print(f"Return code: {response.status_code}")
-          response.raise_for_status()
-
-        print("Central deletion request successfully sent")
     - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
       name: wait-for-central-delete
-      script: |
-        #!/bin/env python
-        import os
-        import time
-        import requests
-
-        ocm_token = os.getenv("OCM_TOKEN")
-        central_id = os.getenv("CENTRAL_ID")
-
-        headers = {"Authorization": "Bearer " + ocm_token, "Content-Type": "application/json"}
-        return_code = None
-
-        while return_code != 404:
-          print("Querying central status")
-          response = requests.get(
-              f"https://api.openshift.com/api/rhacs/v1/centrals/{central_id}",
-              headers=headers,
-          )
-          central_request = response.json()
-          print(central_request)
-          central_status = central_request.get("status")
-          return_code = response.status_code
-
-          if return_code != 404:
-            print(f"Central has status '{central_status}', retrying in 10 seconds...")
-            time.sleep(10)
-
-        print("Central is deleted")
+      command:
+        - python
+        - /scripts/wait-for-central-delete.py
+      volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+          readOnly: true
       env:
         - name: OCM_TOKEN
           value: $(steps.ocm-login.results.ocm-token)
         - name: CENTRAL_ID
           value: $(params.central-id)
+  volumes:
+    - name: scripts
+      configMap:
+        name: destroy-central-scripts
+        defaultMode: 0755
   workspaces:
     - description: |
         Binaries

@@ -20,30 +20,20 @@ spec:
       results:
         - name: rox-api-token
           type: string
-      script: |
-        #!/bin/env python
-        import os
-        import time
-        import requests
-
-        ROX_ENDPOINT = os.getenv("ROX_ENDPOINT")
-        headers = {"Authorization": "Bearer " + os.getenv("ROX_API_TOKEN")}
-        return_code = None
-
-        while return_code != 200:
-          response = requests.get(f"{ROX_ENDPOINT}/v1/integrationhealth/vulndefinitions?component=SCANNER_V4", headers=headers)
-          return_code = response.status_code
-
-          if return_code != 200:
-            print("Scanner may not be ready. Retrying after 300s")
-            time.sleep(300)
-
-        scanner_health = response.json()
-
-        print("Scanner v4 DB Initialized")
-        print(scanner_health.get("lastUpdatedTimestamp"))
+      command:
+        - python
+        - /scripts/wait-for-scanner-init.py
+      volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+          readOnly: true
       env:
         - name: ROX_ENDPOINT
           value: $(params.rox-endpoint)
         - name: ROX_API_TOKEN
           value: $(params.rox-api-token)
+  volumes:
+    - name: scripts
+      configMap:
+        name: wait-for-scanner-init-scripts
+        defaultMode: 0755

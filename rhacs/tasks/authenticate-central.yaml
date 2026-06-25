@@ -30,11 +30,12 @@ spec:
   steps:
     - image: registry.redhat.io/ubi8/ubi-minimal
       name: install-roxctl
-      script: |
-        #!/bin/sh
-        arch="$(uname -m | sed "s/x86_64//")"; arch="${arch:+-$arch}"
-        curl -L -f -o roxctl "https://mirror.openshift.com/pub/rhacs/assets/4.9.2/bin/Linux/roxctl${arch}"
-        chmod +x roxctl
+      command:
+        - /scripts/install-roxctl.sh
+      volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+          readOnly: true
       workingDir: $(workspaces.binaries.path)
     - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
       name: authenticate-central
@@ -42,37 +43,30 @@ spec:
         - name: rox-api-token
           type: string
           description: OIDC Token for ACS authentication, obtained after exchanching the OCM token
-      script: |
-        #!/bin/env python
-        import os
-        import requests
-
-        ROX_ENDPOINT = os.getenv("ROX_ENDPOINT")
-        OCM_TOKEN = os.getenv("OCM_TOKEN")
-        payload = { "idToken": OCM_TOKEN }
-        response = requests.post(f"{ROX_ENDPOINT}/v1/auth/m2m/exchange", json=payload)
-
-        if response.status_code != 200:
-          print("Failed exchanching OIDC token. Machine to machine authentication may not be configured")
-          response.raise_for_status()
-
-        print("Token exchange successful")
-
-        m2m_response = response.json()
-        with open('$(step.results.rox-api-token.path)', 'w') as f:
-          f.write(m2m_response.get("accessToken"))
-        with open('$(results.rox-api-token.path)', 'w') as f:
-          f.write(m2m_response.get("accessToken"))
+      command:
+        - python
+        - /scripts/authenticate-central.py
+      volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+          readOnly: true
       env:
         - name: OCM_TOKEN
           value: $(params.ocm-token)
         - name: ROX_ENDPOINT
           value: $(params.rox-endpoint)
+        - name: STEP_RESULTS_ROX_API_TOKEN_PATH
+          value: $(step.results.rox-api-token.path)
+        - name: RESULTS_ROX_API_TOKEN_PATH
+          value: $(results.rox-api-token.path)
     - image: registry.redhat.io/ubi8/ubi-minimal
       name: test-rox-api-token
-      script: |
-        #!/bin/sh
-        ./roxctl central whoami
+      command:
+        - /scripts/test-rox-api-token.sh
+      volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+          readOnly: true
       env:
         - name: ROX_API_TOKEN
           value: $(steps.authenticate-central.results.rox-api-token)
@@ -84,16 +78,12 @@ spec:
       results:
         - name: rox-api-token-secret-name
           type: string
-      script: |
-        #!/bin/sh
-        set -eu
-        ROX_API_TOKEN_SECRET_NAME="$(params.rox-api-token-secret-name)"
-        oc create secret generic "${ROX_API_TOKEN_SECRET_NAME}" \
-          --namespace="$(context.taskRun.namespace)" \
-          --from-literal=rox_api_token="${ROX_API_TOKEN}" \
-          --dry-run=client -o yaml | oc apply -f -
-        printf '%s' "${ROX_API_TOKEN_SECRET_NAME}" > "$(step.results.rox-api-token-secret-name.path)"
-        printf '%s' "${ROX_API_TOKEN_SECRET_NAME}" > "$(results.rox-api-token-secret-name.path)"
+      command:
+        - /scripts/create-rox-api-token-secret.sh
+      volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+          readOnly: true
       computeResources: {}
       securityContext:
         runAsNonRoot: false
@@ -103,6 +93,19 @@ spec:
           value: $(steps.authenticate-central.results.rox-api-token)
         - name: ROX_API_TOKEN_SECRET_NAME
           value: $(params.rox-api-token-secret-name)
+        - name: ROX_API_TOKEN_SECRET_NAME_PARAM
+          value: $(params.rox-api-token-secret-name)
+        - name: TASK_RUN_NAMESPACE
+          value: $(context.taskRun.namespace)
+        - name: STEP_RESULTS_ROX_API_TOKEN_SECRET_NAME_PATH
+          value: $(step.results.rox-api-token-secret-name.path)
+        - name: RESULTS_ROX_API_TOKEN_SECRET_NAME_PATH
+          value: $(results.rox-api-token-secret-name.path)
+  volumes:
+    - name: scripts
+      configMap:
+        name: authenticate-central-scripts
+        defaultMode: 0755
   workspaces:
     - description: |
         Binaries
