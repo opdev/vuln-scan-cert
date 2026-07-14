@@ -1,0 +1,108 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: rhacs-image-scan
+  labels:
+    app.kubernetes.io/version: "4.0"
+  annotations:
+    tekton.dev/categories: Security
+    tekton.dev/pipelines.minVersion: "0.12.1"
+    tekton.dev/tags: security, rhacs, roxctl, stackrox
+    tekton.dev/displayName: "Red Hat Advanced Cluster Security Image Scan with CSV Export"
+    tekton.dev/platforms: "linux/amd64"
+spec:
+  description: >-
+    Scan an image with Red Hat Advanced Cluster Security (RHACS), generating
+    vulnerability reports in both JSON and CSV formats.
+
+    This task scans images using roxctl and converts the JSON output to CSV
+    format suitable for analysis tools. Results are saved to the results
+    workspace for consumption by other tasks.
+  params:
+    - name: rox_central_endpoint
+      type: string
+      description: |
+        Secret containing the address:port tuple for RHACS Secure Cluster Services (Central)
+        (example - rox.stackrox.io:443)
+    - name: rox_token_file
+      type: string
+      description: Path to the RHACS API token file
+      default: /rox-api-token-auth/rox_api_token
+    - name: image
+      type: string
+      description: |
+        Full name of image to scan.
+        Examples: 'gcr.io/rox/sample:5.0-rc1', '$(params.IMAGE)', '$(params.IMAGE)@$(tasks.buildah.results.IMAGE_DIGEST)'
+    - name: insecure-skip-tls-verify
+      type: string
+      description: |
+        When set to `"true"`, skip verifying the TLS certs of the Central
+        endpoint. Defaults to `"false"`.
+      default: "false"
+    - name: output_format
+      type: string
+      description: Results output format (json | csv | table)
+      default: json
+    - name: rox_image
+      type: string
+      description: Image providing the roxctl tool
+      default: quay.io/stackrox-io/roxctl:4.4.2
+  workspaces:
+    - name: rox-api-token-auth
+      description: |
+        A workspace containing a rox token file. Used to authenticate with the remote central.
+        It is strongly recommended that this workspace be bound to a Kubernetes secret.
+      optional: true
+      readOnly: true
+    - name: results
+      description: |
+        Workspace to store scan results. JSON and CSV files will be written here.
+  stepTemplate:
+    computeResources: {}
+    securityContext:
+      runAsNonRoot: false
+      runAsUser: 0
+  results:
+    - name: scan-result
+      type: string
+      description: Scan result summary
+  steps:
+    - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
+      name: rox-image-scan
+      command:
+        - bash
+        - /scripts/scan-image.sh
+      volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+          readOnly: true
+      env:
+        - name: ROX_ENDPOINT
+          value: $(params.rox_central_endpoint)
+        - name: INSECURE
+          value: $(params.insecure-skip-tls-verify)
+        - name: IMAGE
+          value: $(params.image)
+        - name: ROX_API_TOKEN_FILE
+          value: $(params.rox_token_file)
+        - name: RESULTS_PATH
+          value: $(workspaces.results.path)
+    - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
+      name: json-to-csv-conversion
+      command:
+        - python
+        - /scripts/json-to-csv.py
+      volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+          readOnly: true
+      env:
+        - name: IMAGE
+          value: $(params.image)
+        - name: RESULTS_PATH
+          value: $(workspaces.results.path)
+  volumes:
+    - name: scripts
+      configMap:
+        name: rhacs-image-scan-scripts
+        defaultMode: 0755

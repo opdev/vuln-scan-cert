@@ -39,13 +39,12 @@ $ envsubst < registry-redhat-credentials/registry-redhat-credentials.template.ya
 
 ### Apply RHACS Tasks and Pipeline definitions
 
-The image scan step uses the Tekton catalog [rhacs-image-scan](https://artifacthub.io/packages/tekton-task/tekton-catalog-tasks/rhacs-image-scan/) task.
+The image scan step uses a custom rhacs-image-scan task that includes CSV conversion functionality.
 
 ```shell
 $ oc apply -f configmaps/scripts.yaml
 $ oc apply -f tasks/
 $ oc apply -f pipeline/rhacs.yaml
-$ oc apply -f https://github.com/tektoncd/catalog/raw/main/task/rhacs-image-scan/4.0/rhacs-image-scan.yaml
 ```
 
 ### Increase the maximum Task result size using sidecar logs
@@ -101,6 +100,7 @@ $ tkn pipeline start rhacs \
   --param destroy-central=true \
   -w name=bin,volumeClaimTemplateFile=./pipeline/pvc-template.yaml \
   -w name=rox-api-token-auth,secret="$ROX_TOKEN_SECRET" \
+  -w name=scan-results,volumeClaimTemplateFile=./pipeline/pvc-template.yaml \
   --pipeline-timeout 2h \
   --showlog
 ```
@@ -158,6 +158,15 @@ spec:
     - name: rox-api-token-auth
       secret:
         secretName: my-rhacs-run-rox-api-token
+    - name: scan-results
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 1Gi
+          storageClassName: gp3-csi
+          volumeMode: Filesystem
 ```
 
 `rox-api-token-secret-name` and `rox-api-token-auth.secret.secretName` must match.
@@ -167,4 +176,32 @@ Apply and view logs:
 ```bash
 oc apply -f run-rhacs-pr.yaml -n default
 tkn pipelinerun logs -f rhacs-cli -n default
+```
+
+## Accessing Scan Results
+
+The vulnerability scan results are saved in both JSON and CSV formats to the `scan-results` workspace. When scanning multiple images via matrix (parallel execution), each image produces uniquely named files to prevent overwriting:
+
+- `scan-results-<image-name>.json` - Raw RHACS scan output (for debugging and detailed analysis)
+- `scan-results-<image-name>.csv` - Converted format for Analyzer tools with columns: `cve_id`, `package`, `package_ve`, `rh_severity`, `rh_cvss`, `container`, `container_tag`, `advisory`
+
+Where `<image-name>` is the image name with registry prefix removed and special characters replaced with hyphens for safe filenames.
+
+To access the results after a pipeline run:
+
+```bash
+# Find the scan-results PVC
+oc get pvc | grep scan-results
+
+# Create a temporary pod to access the files
+oc run results-viewer --image=registry.access.redhat.com/ubi9/ubi-minimal --rm -it --restart=Never \
+  --overrides='{"spec":{"containers":[{"name":"results-viewer","image":"registry.access.redhat.com/ubi9/ubi-minimal","command":["sleep","3600"],"volumeMounts":[{"mountPath":"/results","name":"scan-results"}]}],"volumes":[{"name":"scan-results","persistentVolumeClaim":{"claimName":"<pvc-name>"}}]}}'
+
+# Inside the pod, view the results
+ls -la /results/
+cat /results/scan-results-*.csv
+head /results/scan-results-*.json
+
+# Example: if scanning "registry.redhat.io/ubi9/ubi-minimal:latest"
+# Files would be: scan-results-ubi9-ubi-minimal-latest.json and scan-results-ubi9-ubi-minimal-latest.csv
 ```
