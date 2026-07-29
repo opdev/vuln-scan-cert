@@ -1,0 +1,37 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - tasks/provision-central.yaml
+  - tasks/authenticate-central.yaml
+  - tasks/destroy-central.yaml
+  - tasks/configure-central.yaml
+  - tasks/wait-for-scanner-init.yaml
+  - tasks/cleanup-rox-api-token-secret.yaml
+  - tasks/rhacs-image-scan.yaml
+  - pipeline/rhacs.yaml
+  - enable-log-access-to-controller/rbac.yaml
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+configMapGenerator:
+  - name: rhacs-shell-scripts
+    files:
+      - scripts/shell/install-ocm.sh
+      - scripts/shell/install-roxctl.sh
+      - scripts/shell/ocm-token.sh
+      - scripts/shell/test-rox-api-token.sh
+      - scripts/shell/create-rox-api-token-secret.sh
+      - scripts/shell/delete-rox-api-token-secret.sh
+      - scripts/shell/scan-image.sh
+  - name: rhacs-python-scripts
+    files:
+      - scripts/python/authenticate-central.py
+      - scripts/python/configure-central.py
+      - scripts/python/destroy-central.py
+      - scripts/python/provision-central.py
+      - scripts/python/wait-for-central-delete.py
+      - scripts/python/wait-for-central-ready.py
+      - scripts/python/wait-for-scanner-init.py
+      - scripts/python/json-to-csv.py

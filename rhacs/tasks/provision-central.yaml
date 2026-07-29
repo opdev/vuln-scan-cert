@@ -35,14 +35,21 @@ spec:
     securityContext:
       runAsNonRoot: false
       runAsUser: 0
+  volumes:
+    - name: shell-scripts
+      configMap:
+        name: rhacs-shell-scripts
+        defaultMode: 0755
+    - name: python-scripts
+      configMap:
+        name: rhacs-python-scripts
   steps:
     - image: registry.redhat.io/ubi8/ubi-minimal
       name: install-ocm
-      command:
-        - /scripts/install-ocm.sh
+      command: ["/scripts/shell/install-ocm.sh"]
       volumeMounts:
-        - name: scripts
-          mountPath: /scripts
+        - name: shell-scripts
+          mountPath: /scripts/shell
           readOnly: true
       workingDir: $(workspaces.binaries.path)
     - image: registry.redhat.io/ubi8/ubi-minimal
@@ -51,11 +58,10 @@ spec:
         - name: ocm-token
           type: string
           description: Token generated when logging into OCM using Service Account credentials
-      command:
-        - /scripts/ocm-login.sh
+      command: ["/scripts/shell/ocm-token.sh"]
       volumeMounts:
-        - name: scripts
-          mountPath: /scripts
+        - name: shell-scripts
+          mountPath: /scripts/shell
           readOnly: true
       env:
         - name: CLIENT_ID
@@ -68,23 +74,21 @@ spec:
             secretKeyRef:
               name: $(params.service-account-creds-secret)
               key: "client-secret"
-        - name: STEP_RESULTS_OCM_TOKEN_PATH
+        - name: STEP_RESULT_PATH
           value: $(step.results.ocm-token.path)
-        - name: RESULTS_OCM_TOKEN_PATH
+        - name: TASK_RESULT_PATH
           value: $(results.ocm-token.path)
       workingDir: $(workspaces.binaries.path)
-    - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
+    - image: image-registry.openshift-image-registry.svc:5000/lslavkov-testing/python3-with-requests:latest
       name: provision-central
       results:
         - name: central-id
           type: string
           description: ID of provisionned central in ACS CS
-      command:
-        - python
-        - /scripts/provision-central.py
+      command: ["python", "/scripts/python/provision-central.py"]
       volumeMounts:
-        - name: scripts
-          mountPath: /scripts
+        - name: python-scripts
+          mountPath: /scripts/python
           readOnly: true
       env:
         - name: OCM_TOKEN
@@ -97,31 +101,24 @@ spec:
           value: $(params.central-aws-region)
         - name: EXISTING_CENTRAL_ID
           value: $(params.existing-central-id)
-        - name: STEP_RESULTS_CENTRAL_ID_PATH
+        - name: STEP_RESULT_PATH
           value: $(step.results.central-id.path)
-        - name: RESULTS_CENTRAL_ID_PATH
+        - name: TASK_RESULT_PATH
           value: $(results.central-id.path)
     - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
       name: wait-for-central-ready
-      command:
-        - python
-        - /scripts/wait-for-central-ready.py
+      command: ["python", "/scripts/python/wait-for-central-ready.py"]
       volumeMounts:
-        - name: scripts
-          mountPath: /scripts
+        - name: python-scripts
+          mountPath: /scripts/python
           readOnly: true
       env:
         - name: OCM_TOKEN
           value: $(steps.ocm-login.results.ocm-token)
         - name: CENTRAL_ID
           value: $(steps.provision-central.results.central-id)
-        - name: RESULTS_ROX_ENDPOINT_PATH
+        - name: ROX_ENDPOINT_PATH
           value: $(results.rox-endpoint.path)
-  volumes:
-    - name: scripts
-      configMap:
-        name: provision-central-scripts
-        defaultMode: 0755
   workspaces:
     - description: |
         Binaries

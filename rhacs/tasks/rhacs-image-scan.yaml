@@ -66,15 +66,21 @@ spec:
     - name: scan-result
       type: string
       description: Scan result summary
+  volumes:
+    - name: shell-scripts
+      configMap:
+        name: rhacs-shell-scripts
+        defaultMode: 0755
+    - name: python-scripts
+      configMap:
+        name: rhacs-python-scripts
   steps:
     - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
       name: rox-image-scan
-      command:
-        - bash
-        - /scripts/scan-image.sh
+      command: ["bash", "/scripts/shell/scan-image.sh"]
       volumeMounts:
-        - name: scripts
-          mountPath: /scripts
+        - name: shell-scripts
+          mountPath: /scripts/shell
           readOnly: true
       env:
         - name: ROX_ENDPOINT
@@ -89,20 +95,13 @@ spec:
           value: $(workspaces.results.path)
     - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
       name: json-to-csv-conversion
-      command:
-        - python
-        - /scripts/json-to-csv.py
+      command: ["python", "/scripts/python/json-to-csv.py"]
       volumeMounts:
-        - name: scripts
-          mountPath: /scripts
+        - name: python-scripts
+          mountPath: /scripts/python
           readOnly: true
       env:
         - name: IMAGE
           value: $(params.image)
         - name: RESULTS_PATH
           value: $(workspaces.results.path)
-  volumes:
-    - name: scripts
-      configMap:
-        name: rhacs-image-scan-scripts
-        defaultMode: 0755

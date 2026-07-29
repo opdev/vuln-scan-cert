@@ -39,13 +39,42 @@ $ envsubst < registry-redhat-credentials/registry-redhat-credentials.template.ya
 
 ### Apply RHACS Tasks and Pipeline definitions
 
-The image scan step uses a custom rhacs-image-scan task that includes CSV conversion functionality.
+All Tekton resources (Tasks, Pipeline, RBAC) and script ConfigMaps are managed
+via [Kustomize](https://kubectl.docs.kubernetes.io/references/kustomize/kustomization/).
+Scripts live as standalone files under `scripts/` and are bundled into two
+ConfigMaps (`rhacs-shell-scripts`, `rhacs-python-scripts`) by the
+`configMapGenerator` in `kustomization.yaml`.
+
+Deploy everything in one command:
 
 ```shell
-$ oc apply -f configmaps/scripts.yaml
-$ oc apply -f tasks/
-$ oc apply -f pipeline/rhacs.yaml
+$ oc apply -k .
 ```
+
+This is equivalent to `kustomize build . | oc apply -f -` and creates/updates:
+- Two ConfigMaps containing all shell and Python scripts
+- Seven Tekton Tasks (each mounts the ConfigMaps and runs scripts via `command:`)
+- The `rhacs` Pipeline
+- RBAC for sidecar-logs result storage
+
+#### Adding or modifying scripts
+
+1. Edit the script file under `scripts/shell/` or `scripts/python/`
+2. If adding a new script, add its path to the corresponding `configMapGenerator`
+   entry in `kustomization.yaml`
+3. Re-apply: `oc apply -k .`
+
+The scripts are the single source of truth — there are no separate ConfigMap
+YAML manifests to keep in sync. Kustomize generates them at apply time.
+
+#### Previewing what will be applied
+
+```shell
+$ kubectl kustomize .
+```
+
+This renders all resources to stdout without applying them, useful for review
+or piping into `diff`.
 
 ### Increase the maximum Task result size using sidecar logs
 

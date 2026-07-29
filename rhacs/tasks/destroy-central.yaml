@@ -12,14 +12,21 @@ spec:
     securityContext:
       runAsNonRoot: false
       runAsUser: 0
+  volumes:
+    - name: shell-scripts
+      configMap:
+        name: rhacs-shell-scripts
+        defaultMode: 0755
+    - name: python-scripts
+      configMap:
+        name: rhacs-python-scripts
   steps:
     - image: registry.redhat.io/ubi8/ubi-minimal
       name: install-ocm
-      command:
-        - /scripts/install-ocm.sh
+      command: ["/scripts/shell/install-ocm.sh"]
       volumeMounts:
-        - name: scripts
-          mountPath: /scripts
+        - name: shell-scripts
+          mountPath: /scripts/shell
           readOnly: true
       workingDir: $(workspaces.binaries.path)
     - image: registry.redhat.io/ubi8/ubi-minimal
@@ -28,13 +35,14 @@ spec:
         - name: ocm-token
           type: string
           description: OCM Token
-      command:
-        - /scripts/ocm-login.sh
+      command: ["/scripts/shell/ocm-token.sh"]
       volumeMounts:
-        - name: scripts
-          mountPath: /scripts
+        - name: shell-scripts
+          mountPath: /scripts/shell
           readOnly: true
       env:
+        - name: STEP_RESULT_PATH
+          value: $(step.results.ocm-token.path)
         - name: CLIENT_ID
           valueFrom:
             secretKeyRef:
@@ -45,42 +53,31 @@ spec:
             secretKeyRef:
               name: rh-openid-credentials
               key: "client-secret"
-        - name: STEP_RESULTS_OCM_TOKEN_PATH
-          value: $(step.results.ocm-token.path)
       workingDir: $(workspaces.binaries.path)
     - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
       name: destroy-central
-      command:
-        - python
-        - /scripts/destroy-central.py
+      command: ["python", "/scripts/python/destroy-central.py"]
       volumeMounts:
-        - name: scripts
-          mountPath: /scripts
+        - name: python-scripts
+          mountPath: /scripts/python
           readOnly: true
       env:
         - name: OCM_TOKEN
           value: $(steps.ocm-login.results.ocm-token)
         - name: CENTRAL_ID
           value: $(params.central-id)
-    - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
+    - image: image-registry.openshift-image-registry.svc:5000/lslavkov-testing/python3-with-requests:latest
       name: wait-for-central-delete
-      command:
-        - python
-        - /scripts/wait-for-central-delete.py
+      command: ["python", "/scripts/python/wait-for-central-delete.py"]
       volumeMounts:
-        - name: scripts
-          mountPath: /scripts
+        - name: python-scripts
+          mountPath: /scripts/python
           readOnly: true
       env:
         - name: OCM_TOKEN
           value: $(steps.ocm-login.results.ocm-token)
         - name: CENTRAL_ID
           value: $(params.central-id)
-  volumes:
-    - name: scripts
-      configMap:
-        name: destroy-central-scripts
-        defaultMode: 0755
   workspaces:
     - description: |
         Binaries

@@ -14,26 +14,20 @@ spec:
     securityContext:
       runAsNonRoot: false
       runAsUser: 0
+  volumes:
+    - name: python-scripts
+      configMap:
+        name: rhacs-python-scripts
   steps:
-    - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
+    - image: image-registry.openshift-image-registry.svc:5000/lslavkov-testing/python3-with-requests:latest
       name: wait-for-scanner-init
-      results:
-        - name: rox-api-token
-          type: string
-      command:
-        - python
-        - /scripts/wait-for-scanner-init.py
+      command: ["python", "/scripts/python/wait-for-scanner-init.py"]
       volumeMounts:
-        - name: scripts
-          mountPath: /scripts
+        - name: python-scripts
+          mountPath: /scripts/python
           readOnly: true
       env:
         - name: ROX_ENDPOINT
           value: $(params.rox-endpoint)
         - name: ROX_API_TOKEN
           value: $(params.rox-api-token)
-  volumes:
-    - name: scripts
-      configMap:
-        name: wait-for-scanner-init-scripts
-        defaultMode: 0755

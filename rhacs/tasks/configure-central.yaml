@@ -17,18 +17,17 @@ spec:
     securityContext:
       runAsNonRoot: false
       runAsUser: 0
+  volumes:
+    - name: python-scripts
+      configMap:
+        name: rhacs-python-scripts
   steps:
     - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
       name: configure-central
-      results:
-        - name: rox-api-token
-          type: string
-      command:
-        - python
-        - /scripts/configure-central.py
+      command: ["python", "/scripts/python/configure-central.py"]
       volumeMounts:
-        - name: scripts
-          mountPath: /scripts
+        - name: python-scripts
+          mountPath: /scripts/python
           readOnly: true
       env:
         - name: ROX_ENDPOINT
@@ -45,8 +44,3 @@ spec:
             secretKeyRef:
               name: $(params.registry-redhat-creds-secret)
               key: "registry-redhat-password"
-  volumes:
-    - name: scripts
-      configMap:
-        name: configure-central-scripts
-        defaultMode: 0755

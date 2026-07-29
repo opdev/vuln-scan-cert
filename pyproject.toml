@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "requests>=2.34.2",
     "ruff>=0.15.14",
 ]
 package-mode = false
