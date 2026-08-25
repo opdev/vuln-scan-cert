@@ -79,7 +79,7 @@ spec:
         - name: TASK_RESULT_PATH
           value: $(results.ocm-token.path)
       workingDir: $(workspaces.binaries.path)
-    - image: image-registry.openshift-image-registry.svc:5000/lslavkov-testing/python3-with-requests:latest
+    - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
       name: provision-central
       results:
         - name: central-id
