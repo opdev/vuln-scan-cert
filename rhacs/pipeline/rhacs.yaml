@@ -34,8 +34,6 @@ spec:
           value: $(tasks.provision-central.results.ocm-token)
         - name: rox-endpoint
           value: $(tasks.provision-central.results.rox-endpoint)
-        - name: rox-api-token-secret-name
-          value: $(params.rox-api-token-secret-name)
       runAfter:
         - provision-central
       workspaces:
@@ -76,15 +74,13 @@ spec:
           - name: image
             value: $(params.images[*])
       params:
-        - name: rox_central_endpoint
+        - name: rox-endpoint
           value: $(tasks.provision-central.results.rox-endpoint)
-        - name: rox_token_file
-          value: /rox-api-token-auth/rox_api_token
+        - name: rox-api-token
+          value: $(tasks.authenticate-central.results.rox-api-token)
         - name: insecure-skip-tls-verify
           value: "true"
       workspaces:
-        - name: rox-api-token-auth
-          workspace: rox-api-token-auth
         - name: results
           workspace: scan-results
   # - name: upload-result
@@ -94,12 +90,6 @@ spec:
       description: Container images to scan.
       default:
         - docker.io/library/alpine:latest
-    - name: rox-api-token-secret-name
-      type: string
-      description: |
-        Name of the Secret (key rox_api_token) for rhacs-image-scan, created by authenticate-central.
-        Must match the rox-api-token-auth workspace secretName on the PipelineRun.
-      default: rhacs-rox-api-token
     - name: service-account-creds-secret
       type: string
       description: Name of Secret containing Service Account credentials
@@ -131,13 +121,6 @@ spec:
         - "true"
         - "false"
   finally:
-    - name: cleanup-rox-api-token-secret
-      taskRef:
-        kind: Task
-        name: cleanup-rox-api-token-secret
-      params:
-        - name: rox-api-token-secret-name
-          value: $(tasks.authenticate-central.results.rox-api-token-secret-name)
     - name: destroy-central
       taskRef:
         kind: Task
@@ -154,10 +137,6 @@ spec:
           workspace: bin
   workspaces:
     - name: bin
-    - name: rox-api-token-auth
-      description: |
-        ROX API token for rhacs-image-scan. Bind to the Secret named by
-        param rox-api-token-secret-name (created by authenticate-central).
     - name: scan-results
       description: |
         Workspace to store vulnerability scan results (JSON and CSV formats).

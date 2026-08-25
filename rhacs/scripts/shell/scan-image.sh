@@ -3,7 +3,6 @@ set -euo pipefail
 
 echo "Scanning image: ${IMAGE}"
 echo "ROX Central endpoint: ${ROX_ENDPOINT}"
-echo "API Token file: ${ROX_API_TOKEN_FILE}"
 
 # Create results directory
 mkdir -p "${RESULTS_PATH}"
@@ -34,14 +33,6 @@ fi
 
 # Perform the image scan and save results to JSON file with unique name
 JSON_OUTPUT="${RESULTS_PATH}/scan-results-${IMAGE_SAFE}.json"
-
-echo "ROX API Token file: ${ROX_API_TOKEN_FILE}"
-if [ ! -f "${ROX_API_TOKEN_FILE}" ]; then
-    echo "ERROR: ROX API token file not found at ${ROX_API_TOKEN_FILE}"
-    echo "Available files in /workspace:"
-    find /workspace -name "*token*" -o -name "rox*" 2>/dev/null || echo "No token files found"
-    exit 1
-fi
 
 echo "Running scan command..."
 # Run the scan with JSON output
