@@ -10,6 +10,26 @@ Requirements TBD
 
 https://docs.redhat.com/en/documentation/red_hat_openshift_pipelines/1.21/html/installing_and_configuring/installing-pipelines
 
+#### Increase the maximum Task result size using sidecar logs
+
+Documentation: https://tekton.dev/docs/pipelines/additional-configs/#enabling-larger-results-using-sidecar-logs
+
+```shell
+$ oc apply -f enable-log-access-to-controller/rbac.yaml
+$ oc patch cm feature-flags -n openshift-pipelines -p '{"data":{"results-from":"sidecar-logs"}}'
+$ oc patch cm feature-flags -n openshift-pipelines -p '{"data":{"max-result-size":"8192"}}'
+```
+
+This is required due to the size of the `ROX_API_TOKEN`, exceeding the default 4096 bytes.
+
+#### Enable feature flag for Enum parameters
+
+```shell
+$ oc patch cm feature-flags -n openshift-pipelines -p '{"data":{"enable-param-enum":"true"}}'
+```
+
+This allows us to perform input validation using a list of authorized values.
+
 ### Red Hat SSO Service Account
 
 - Follow this link to create a Red Hat Service Account: https://console.redhat.com/iam/service-accounts/
@@ -76,27 +96,10 @@ $ kubectl kustomize .
 This renders all resources to stdout without applying them, useful for review
 or piping into `diff`.
 
-### Increase the maximum Task result size using sidecar logs
-
-Documentation: https://tekton.dev/docs/pipelines/additional-configs/#enabling-larger-results-using-sidecar-logs
-
-```shell
-$ oc apply -f enable-log-access-to-controller/rbac.yaml
-$ oc patch cm feature-flags -n openshift-pipelines -p '{"data":{"results-from":"sidecar-logs"}}'
-$ oc patch cm feature-flags -n openshift-pipelines -p '{"data":{"max-result-size":"8192"}}'
-```
-
-This is required due to the size of the `ROX_API_TOKEN`, exceeding the default 4096 bytes.
-
-### Enable feature flag for Enum parameters
-
-```shell
-$ oc patch cm feature-flags -n openshift-pipelines -p '{"data":{"enable-param-enum":"true"}}'
-```
-
-This allows us to perform input validation using a list of authorized values.
-
 ### Build Container images used in python steps
+
+> You may need to [Configure the internal registry](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/registry/setting-up-and-configuring-the-registry#configuring-registry-storage-baremetal) first
+
 
 ```shell
 $ oc new-build --name python3-with-requests --binary --strategy docker
