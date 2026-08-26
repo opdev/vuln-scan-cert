@@ -66,7 +66,7 @@ spec:
           value: $(steps.ocm-login.results.ocm-token)
         - name: CENTRAL_ID
           value: $(params.central-id)
-    - image: image-registry.openshift-image-registry.svc:5000/lslavkov-testing/python3-with-requests:latest
+    - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
       name: wait-for-central-delete
       command: ["python", "/scripts/python/wait-for-central-delete.py"]
       volumeMounts:

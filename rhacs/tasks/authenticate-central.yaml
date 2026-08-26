@@ -44,7 +44,7 @@ spec:
           mountPath: /scripts/shell
           readOnly: true
       workingDir: $(workspaces.binaries.path)
-    - image: image-registry.openshift-image-registry.svc:5000/lslavkov-testing/python3-with-requests:latest
+    - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
       name: authenticate-central
       results:
         - name: rox-api-token
