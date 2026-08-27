@@ -21,7 +21,7 @@ while return_code != 404:
     return_code = response.status_code
 
     if return_code != 404:
-        print(f"Central has status '{central_status}', retrying in 10 seconds...")
-        time.sleep(10)
+        print(f"Central has status '{central_status}', retrying in 60 seconds...")
+        time.sleep(60)
 
 print("Central is deleted")
