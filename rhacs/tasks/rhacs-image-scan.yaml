@@ -12,22 +12,16 @@ metadata:
     tekton.dev/platforms: "linux/amd64"
 spec:
   description: >-
-    Scan an image with Red Hat Advanced Cluster Security (RHACS), generating
-    vulnerability reports in both JSON and CSV formats.
+    Scan an image with Red Hat Advanced Cluster Security (RHACS), generating vulnerability reports in both JSON and CSV formats.
 
-    This task scans images using roxctl and converts the JSON output to CSV
-    format suitable for analysis tools. Results are saved to the results
-    workspace for consumption by other tasks.
+    This task scans images using roxctl and converts the JSON output to CSV format suitable for analysis tools.
+
+    Results are saved to the results workspace for consumption by other tasks.
   params:
-    - name: rox_central_endpoint
+    - name: rox-endpoint
       type: string
-      description: |
-        Secret containing the address:port tuple for RHACS Secure Cluster Services (Central)
-        (example - rox.stackrox.io:443)
-    - name: rox_token_file
+    - name: rox-api-token
       type: string
-      description: Path to the RHACS API token file
-      default: /rox-api-token-auth/rox_api_token
     - name: image
       type: string
       description: |
@@ -39,21 +33,7 @@ spec:
         When set to `"true"`, skip verifying the TLS certs of the Central
         endpoint. Defaults to `"false"`.
       default: "false"
-    - name: output_format
-      type: string
-      description: Results output format (json | csv | table)
-      default: json
-    - name: rox_image
-      type: string
-      description: Image providing the roxctl tool
-      default: quay.io/stackrox-io/roxctl:4.4.2
   workspaces:
-    - name: rox-api-token-auth
-      description: |
-        A workspace containing a rox token file. Used to authenticate with the remote central.
-        It is strongly recommended that this workspace be bound to a Kubernetes secret.
-      optional: true
-      readOnly: true
     - name: results
       description: |
         Workspace to store scan results. JSON and CSV files will be written here.
@@ -84,13 +64,13 @@ spec:
           readOnly: true
       env:
         - name: ROX_ENDPOINT
-          value: $(params.rox_central_endpoint)
+          value: $(params.rox-endpoint)
         - name: INSECURE
           value: $(params.insecure-skip-tls-verify)
         - name: IMAGE
           value: $(params.image)
-        - name: ROX_API_TOKEN_FILE
-          value: $(params.rox_token_file)
+        - name: ROX_API_TOKEN
+          value: $(params.rox-api-token)
         - name: RESULTS_PATH
           value: $(workspaces.results.path)
     - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest

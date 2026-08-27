@@ -119,11 +119,9 @@ Start a pipeline run either via CLI or via Manifest file
 
 ```shell
 $ export CLOUD_ACCOUNT_ID="REPLACE_ME"
-$ export ROX_TOKEN_SECRET="rhacs-rox-api-token-$(date +%s)"
 $ tkn pipeline start rhacs \
   -n default \
   --param images=registry.redhat.io/rhel9/python-312:9.6,registry.redhat.io/ubi9/ubi-minimal:latest \
-  --param rox-api-token-secret-name="$ROX_TOKEN_SECRET" \
   --param service-account-creds-secret=rh-openid-credentials \
   --param registry-redhat-creds-secret=registry-redhat-credentials \
   --param cloud-account-id=$CLOUD_ACCOUNT_ID \
@@ -131,13 +129,10 @@ $ tkn pipeline start rhacs \
   --param existing-central-id="" \
   --param destroy-central=true \
   -w name=bin,volumeClaimTemplateFile=./pipeline/pvc-template.yaml \
-  -w name=rox-api-token-auth,secret="$ROX_TOKEN_SECRET" \
   -w name=scan-results,volumeClaimTemplateFile=./pipeline/pvc-template.yaml \
   --pipeline-timeout 2h \
   --showlog
 ```
-
-`authenticate-central` creates a Secret (default name `rhacs-rox-api-token`, key `rox_api_token`) and the `rox-api-token-auth` workspace must be bound to that same Secret name (see catalog [API token example](https://artifacthub.io/packages/tekton-task/tekton-catalog-tasks/rhacs-image-scan/)). Use a unique `rox-api-token-secret-name` per concurrent PipelineRun so runs do not overwrite each other's token.
 
 Set `--param destroy-central=false` if you want to keep the deployed Central around for debugging or later use.
 
@@ -173,8 +168,6 @@ spec:
     value: ""
   - name: destroy-central
     value: "true"
-  - name: rox-api-token-secret-name
-    value: my-rhacs-run-rox-api-token
   timeouts:
     pipeline: 2h0m0s
   workspaces:
@@ -187,9 +180,6 @@ spec:
               storage: 1Gi
           storageClassName: gp3-csi
           volumeMode: Filesystem
-    - name: rox-api-token-auth
-      secret:
-        secretName: my-rhacs-run-rox-api-token
     - name: scan-results
       volumeClaimTemplate:
         spec:
@@ -201,7 +191,6 @@ spec:
           volumeMode: Filesystem
 ```
 
-`rox-api-token-secret-name` and `rox-api-token-auth.secret.secretName` must match.
 
 Apply and view logs:
 

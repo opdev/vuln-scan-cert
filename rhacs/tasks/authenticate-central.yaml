@@ -10,18 +10,10 @@ spec:
     - name: ocm-token
       type: string
       description: Token generated when logging into OCM using Service Account credentials
-    - name: rox-api-token-secret-name
-      type: string
-      description: |
-        Name of the Secret (key rox_api_token) created for rhacs-image-scan.
-        Must match the rox-api-token-auth workspace secretName on the PipelineRun.
   results:
     - name: rox-api-token
       type: string
       description: OIDC Token for ACS authentication, obtained after exchanching the OCM token
-    - name: rox-api-token-secret-name
-      type: string
-      description: Name of the Secret containing the ROX API token
   stepTemplate:
     computeResources: {}
     securityContext:
@@ -77,31 +69,6 @@ spec:
         - name: ROX_ENDPOINT
           value: $(params.rox-endpoint)
       workingDir: $(workspaces.binaries.path)
-    - image: registry.redhat.io/openshift4/ose-cli:latest
-      name: create-rox-api-token-secret
-      results:
-        - name: rox-api-token-secret-name
-          type: string
-      command: ["/scripts/shell/create-rox-api-token-secret.sh"]
-      volumeMounts:
-        - name: shell-scripts
-          mountPath: /scripts/shell
-          readOnly: true
-      computeResources: {}
-      securityContext:
-        runAsNonRoot: false
-        runAsUser: 0
-      env:
-        - name: ROX_API_TOKEN
-          value: $(steps.authenticate-central.results.rox-api-token)
-        - name: ROX_API_TOKEN_SECRET_NAME
-          value: $(params.rox-api-token-secret-name)
-        - name: TASK_RUN_NAMESPACE
-          value: $(context.taskRun.namespace)
-        - name: STEP_RESULT_PATH
-          value: $(step.results.rox-api-token-secret-name.path)
-        - name: TASK_RESULT_PATH
-          value: $(results.rox-api-token-secret-name.path)
   workspaces:
     - description: |
         Binaries
