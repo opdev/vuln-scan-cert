@@ -19,8 +19,8 @@ while central_request_status != "ready":
     central_request_status = central_request.get("status")
 
     if central_request_status != "ready":
-        print("Central is not ready yet, retrying in 10 seconds...")
-        time.sleep(10)
+        print("Central is not ready yet, retrying in 60 seconds...")
+        time.sleep(60)
 
 print("Central is Ready")
 
