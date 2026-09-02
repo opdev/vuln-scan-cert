@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - tasks/upload-results.yaml
+generatorOptions:
+  disableNameSuffixHash: true
+configMapGenerator:
+  - name: common-python-scripts
+    files:
+      - scripts/python/upload-results.py

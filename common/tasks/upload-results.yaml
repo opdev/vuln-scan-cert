@@ -1,0 +1,59 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: upload-results
+spec:
+  description: >-
+    Upload vulnerability scan results (CSV) to the Vulnerability Analyser tool.
+
+    Pipelines must set analyser-url explicitly.
+  params:
+    - name: results-file
+      type: string
+      description: CSV filename within the results workspace
+    - name: analyser-url
+      type: string
+      description: Analyser base URL
+    - name: wait
+      type: string
+      description: Wait for analysis to complete before exiting
+      default: "false"
+    - name: dry-run
+      type: string
+      description: Validate the CSV only; do not upload
+      default: "false"
+    - name: no-verify-ssl
+      type: string
+      description: Disable SSL certificate verification
+      default: "false"
+  workspaces:
+    - name: results
+      description: Workspace containing the CSV scan results file
+  stepTemplate:
+    computeResources: {}
+    securityContext:
+      runAsNonRoot: false
+      runAsUser: 0
+  volumes:
+    - name: python-scripts
+      configMap:
+        name: common-python-scripts
+  steps:
+    - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
+      name: upload-results
+      command: ["python", "/scripts/python/upload-results.py"]
+      volumeMounts:
+        - name: python-scripts
+          mountPath: /scripts/python
+          readOnly: true
+      env:
+        - name: ANALYSER_FILE
+          value: $(workspaces.results.path)/$(params.results-file)
+        - name: ANALYSER_URL
+          value: $(params.analyser-url)
+        - name: ANALYSER_WAIT
+          value: $(params.wait)
+        - name: ANALYSER_DRY_RUN
+          value: $(params.dry-run)
+        - name: ANALYSER_NO_VERIFY_SSL
+          value: $(params.no-verify-ssl)
