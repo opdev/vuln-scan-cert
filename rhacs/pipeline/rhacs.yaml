@@ -84,7 +84,28 @@ spec:
         - name: results
           workspace: scan-results
           subPath: $(params.image)
-  # - name: upload-result
+    - name: upload-results
+      taskRef:
+        kind: Task
+        name: upload-results
+      runAfter:
+        - run-image-scan
+      matrix:
+        params:
+          - name: results-file
+            value: $(tasks.run-image-scan.results.csv-file[*])
+      params:
+        - name: analyser-url
+          value: $(params.analyser-url)
+        - name: wait
+          value: $(params.wait-for-analysis)
+        - name: dry-run
+          value: $(params.upload-dry-run)
+        - name: no-verify-ssl
+          value: $(params.analyser-no-verify-ssl)
+      workspaces:
+        - name: results
+          workspace: scan-results
   params:
     - name: images
       type: array
@@ -118,6 +139,30 @@ spec:
       type: string
       description: Whether to destroy Central in the finally phase
       default: "true"
+      enum:
+        - "true"
+        - "false"
+    - name: analyser-url
+      type: string
+      description: Analyser base URL
+    - name: wait-for-analysis
+      type: string
+      description: Wait for Analyser analysis to complete after each upload
+      default: "false"
+      enum:
+        - "true"
+        - "false"
+    - name: upload-dry-run
+      type: string
+      description: Validate CSV files only; do not upload to the Analyser
+      default: "false"
+      enum:
+        - "true"
+        - "false"
+    - name: analyser-no-verify-ssl
+      type: string
+      description: Disable SSL certificate verification for Analyser uploads
+      default: "false"
       enum:
         - "true"
         - "false"

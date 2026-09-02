@@ -57,13 +57,14 @@ $ export REGISTRY_REDHAT_PASSWORD=<my_service_account_token>
 $ envsubst < registry-redhat-credentials/registry-redhat-credentials.template.yaml | oc apply -f -
 ```
 
-### Apply RHACS Tasks and Pipeline definitions
+### Apply RHACS Tasks, Common Tasks, and RHACS Pipeline definitions
 
 All Tekton resources (Tasks, Pipeline, RBAC) and script ConfigMaps are managed
 via [Kustomize](https://kubectl.docs.kubernetes.io/references/kustomize/kustomization/).
 Scripts live as standalone files under `scripts/` and are bundled into two
 ConfigMaps (`rhacs-shell-scripts`, `rhacs-python-scripts`) by the
-`configMapGenerator` in `kustomization.yaml`.
+`configMapGenerator` in `kustomization.yaml`. Shared resources from
+[`../common/`](../common/) (including the `upload-results` Task) are also included.
 
 Deploy everything in one command:
 
@@ -72,8 +73,8 @@ $ oc apply -k .
 ```
 
 This is equivalent to `kustomize build . | oc apply -f -` and creates/updates:
-- Two ConfigMaps containing all shell and Python scripts
-- Seven Tekton Tasks (each mounts the ConfigMaps and runs scripts via `command:`)
+- Three ConfigMaps containing all shell and Python scripts
+- Eight Tekton Tasks (RHACS tasks plus the shared `upload-results` task)
 - The `rhacs` Pipeline
 - RBAC for sidecar-logs result storage
 
@@ -86,15 +87,6 @@ This is equivalent to `kustomize build . | oc apply -f -` and creates/updates:
 
 The scripts are the single source of truth — there are no separate ConfigMap
 YAML manifests to keep in sync. Kustomize generates them at apply time.
-
-#### Previewing what will be applied
-
-```shell
-$ kubectl kustomize .
-```
-
-This renders all resources to stdout without applying them, useful for review
-or piping into `diff`.
 
 ### Build Container images used in python steps
 
@@ -119,6 +111,7 @@ Start a pipeline run either via CLI or via Manifest file
 
 ```shell
 $ export CLOUD_ACCOUNT_ID="REPLACE_ME"
+$ export ANALYSER_URL="x.x.x.x"
 $ tkn pipeline start rhacs \
   -n default \
   --param images=registry.redhat.io/rhel9/python-312:9.6,registry.redhat.io/ubi9/ubi-minimal:latest \
@@ -128,8 +121,10 @@ $ tkn pipeline start rhacs \
   --param central-aws-region=eu-west-1 \
   --param existing-central-id="" \
   --param destroy-central=true \
+  --param analyser-url=$ANALYSER_URL \
   -w name=bin,volumeClaimTemplateFile=./pipeline/pvc-template.yaml \
   -w name=scan-results,volumeClaimTemplateFile=./pipeline/pvc-template.yaml \
+  --use-param-defaults \
   --pipeline-timeout 2h \
   --showlog
 ```
@@ -168,6 +163,8 @@ spec:
     value: ""
   - name: destroy-central
     value: "true"
+  - name: analyser-url
+    value: "x.x.x.x"
   timeouts:
     pipeline: 2h0m0s
   workspaces:

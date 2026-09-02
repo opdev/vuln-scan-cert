@@ -129,6 +129,12 @@ def main():
         csv_data = extract_vulnerability_data(scan_data, container_name, container_tag)
         write_csv_data(csv_data, csv_file)
 
+        csv_basename = os.path.basename(csv_file)
+        task_result_path = os.environ.get("TASK_RESULT_PATH")
+        if task_result_path:
+            with open(task_result_path, "w") as f:
+                f.write(csv_basename)
+
         print(f"Successfully converted {len(csv_data)} vulnerabilities from {json_file} to {csv_file}")
 
         if csv_data:
