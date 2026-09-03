@@ -55,7 +55,7 @@ def extract_vulnerability_data(scan_data, container_name, container_tag):
         csv_row = {
             "cve_id": str(vuln.get("cve", vuln.get("cveId", vuln.get("name", "")))),
             "package": str(vuln.get("componentName", vuln.get("component", {}).get("name", ""))),
-            "package_ve": str(vuln.get("componentVersion", vuln.get("component", {}).get("version", ""))),
+            "package_version": str(vuln.get("componentVersion", vuln.get("component", {}).get("version", ""))),
             "rh_severity": str(vuln.get("severity", vuln.get("cveSeverity", ""))).upper(),
             "rh_cvss": str(vuln.get("cvss", vuln.get("cveCVSS", vuln.get("scoreV3", "")))),
             "container": container_name,
@@ -76,7 +76,7 @@ def write_csv_data(csv_data, output_path):
     fieldnames = [
         "cve_id",
         "package",
-        "package_ve",
+        "package_version",
         "rh_severity",
         "rh_cvss",
         "container",
