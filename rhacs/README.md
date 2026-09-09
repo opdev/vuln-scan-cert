@@ -119,9 +119,10 @@ Start a pipeline run either via CLI or via Manifest file
 
 ```shell
 $ export CLOUD_ACCOUNT_ID="REPLACE_ME"
+$ export IMAGES="registry.redhat.io/rhel9/python-312:1-1762157847,registry.redhat.io/openshift4/ose-console-rhel9:v4.18.0-202512031513.p2.ga29310a.assembly.stream.el9"
 $ tkn pipeline start rhacs \
   -n default \
-  --param images=registry.redhat.io/rhel9/python-312:9.6,registry.redhat.io/ubi9/ubi-minimal:latest \
+  --param images="$IMAGES" \
   --param service-account-creds-secret=rh-openid-credentials \
   --param registry-redhat-creds-secret=registry-redhat-credentials \
   --param cloud-account-id=$CLOUD_ACCOUNT_ID \
@@ -158,8 +159,8 @@ spec:
     value: "REPLACE_ME"
   - name: images
     value:
-      - registry.redhat.io/rhel9/python-312:9.6
-      - registry.redhat.io/ubi9/ubi-minimal:latest
+      - registry.redhat.io/rhel9/python-312:1-1762157847
+      - registry.redhat.io/openshift4/ose-console-rhel9:v4.18.0-202512031513.p2.ga29310a.assembly.stream.el9
   - name: service-account-creds-secret
     value: rh-openid-credentials
   - name: registry-redhat-creds-secret
