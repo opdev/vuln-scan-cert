@@ -201,12 +201,14 @@ tkn pipelinerun logs -f rhacs-cli -n default
 
 ## Accessing Scan Results
 
-The vulnerability scan results are saved in both JSON and CSV formats to the `scan-results` workspace. When scanning multiple images via matrix (parallel execution), each image produces uniquely named files to prevent overwriting:
+The vulnerability scan results are saved in both JSON and CSV formats to the `scan-results` workspace. When scanning multiple images via matrix (parallel execution), each TaskRun writes to a dedicated workspace `subPath` named after the image reference. Within each subPath, files are named:
 
 - `scan-results-<image-name>.json` - Raw RHACS scan output (for debugging and detailed analysis)
 - `scan-results-<image-name>.csv` - Converted format for Analyzer tools with columns: `cve_id`, `package`, `package_ve`, `rh_severity`, `rh_cvss`, `container`, `container_tag`, `advisory`
 
 Where `<image-name>` is the image name with registry prefix removed and special characters replaced with hyphens for safe filenames.
+
+On the PVC, results are stored under `<image-reference>/scan-results-<image-name>.{json,csv}` (the image reference may create nested directories).
 
 To access the results after a pipeline run:
 
