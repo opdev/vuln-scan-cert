@@ -83,6 +83,7 @@ spec:
       workspaces:
         - name: results
           workspace: scan-results
+          subPath: $(params.image)
   # - name: upload-result
   params:
     - name: images
