@@ -43,9 +43,10 @@ spec:
       runAsNonRoot: false
       runAsUser: 0
   results:
-    - name: csv-file
+    - name: results-path
       type: string
-      description: Filename of the generated CSV within the results workspace
+      description: >-
+        Path to the generated CSV relative to the scan-results workspace root (image subPath/filename)
   volumes:
     - name: shell-scripts
       configMap:
@@ -86,4 +87,4 @@ spec:
         - name: RESULTS_PATH
           value: $(workspaces.results.path)
         - name: TASK_RESULT_PATH
-          value: $(results.csv-file.path)
+          value: $(results.results-path.path)

@@ -171,73 +171,115 @@ def upload(base_url: str, file_path: str, verify_ssl: bool) -> dict:
 # ---------------------------------------------------------------------------
 # Polling
 # ---------------------------------------------------------------------------
-def poll_until_done(base_url: str, job_id: str, verify_ssl: bool) -> dict:
-    """Poll GET /jobs/{job_id}/status until completed or failed.
+def _fetch_job_status(base_url: str, job_id: str, verify_ssl: bool) -> dict | None:
+    """GET /jobs/{job_id}/status once. Returns parsed JSON or None if retryable."""
+    status_url = f"{base_url.rstrip('/')}/jobs/{job_id}/status"
+    try:
+        resp = requests.get(status_url, timeout=30, verify=verify_ssl)
+    except requests.RequestException as exc:
+        warn(f"Poll request failed (job {job_id}): {exc} — retrying")
+        return None
 
-    Returns the final status payload on success.
+    if resp.status_code != 200:
+        warn(f"Poll returned HTTP {resp.status_code} (job {job_id}) — retrying")
+        return None
+
+    try:
+        return resp.json()
+    except ValueError:
+        warn(f"Server returned non-JSON response (job {job_id})")
+        return None
+
+
+def poll_jobs_until_done(
+    base_url: str,
+    job_ids: list[str],
+    verify_ssl: bool,
+    deadline: float,
+) -> dict[str, dict]:
+    """Poll GET /jobs/{job_id}/status for every job until all complete or one fails.
+
+    Uses a single shared deadline for the whole wait (not per job).
+    Returns job_id -> final status payload on success.
     Calls sys.exit(3) on analysis failure or timeout.
     """
-    status_url = f"{base_url.rstrip('/')}/jobs/{job_id}/status"
-    deadline = time.time() + POLL_TIMEOUT_S
+    if not job_ids:
+        return {}
 
-    info(f"Waiting for analysis to complete (job {job_id})...")
+    pending = set(job_ids)
+    results: dict[str, dict] = {}
 
-    while time.time() < deadline:
-        try:
-            resp = requests.get(status_url, timeout=30, verify=verify_ssl)
-        except requests.RequestException as exc:
-            warn(f"Poll request failed: {exc} — retrying in {POLL_INTERVAL_S}s")
+    if len(job_ids) == 1:
+        info(f"Waiting for analysis to complete (job {job_ids[0]})...")
+    else:
+        info(f"Waiting for analysis to complete ({len(job_ids)} jobs)...")
+
+    while pending and time.time() < deadline:
+        for job_id in list(pending):
+            data = _fetch_job_status(base_url, job_id, verify_ssl)
+            if data is None:
+                continue
+
+            status = data.get("status", "unknown")
+            analyzers = data.get("analyzers", {})
+            done = [k for k, v in analyzers.items() if v == "completed"]
+            if done:
+                info(f"  job {job_id} completed: {', '.join(done)}")
+
+            if status == "completed":
+                pending.discard(job_id)
+                results[job_id] = data
+                info(f"Analysis completed successfully (job {job_id})")
+                continue
+
+            if status == "failed":
+                error(f"Analysis failed (job {job_id}): {data.get('error', 'unknown error')}")
+                sys.exit(3)
+
+        if pending:
             time.sleep(POLL_INTERVAL_S)
-            continue
 
-        if resp.status_code != 200:
-            warn(f"Poll returned HTTP {resp.status_code} — retrying")
-            time.sleep(POLL_INTERVAL_S)
-            continue
+    if pending:
+        error(f"Analysis did not complete within {POLL_TIMEOUT_S}s — timed out")
+        sys.exit(3)
 
-        try:
-            data = resp.json()
-        except ValueError:
-            warn("Server returned non-JSON response")
-            time.sleep(POLL_INTERVAL_S)
-            continue
-
-        status = data.get("status", "unknown")
-
-        analyzers = data.get("analyzers", {})
-        done = [k for k, v in analyzers.items() if v == "completed"]
-        if done:
-            info(f"  completed: {', '.join(done)}")
-
-        if status == "completed":
-            info("Analysis completed successfully")
-            return data
-
-        if status == "failed":
-            error(f"Analysis failed: {data.get('error', 'unknown error')}")
-            sys.exit(3)
-
-        time.sleep(POLL_INTERVAL_S)
-
-    error(f"Analysis did not complete within {POLL_TIMEOUT_S}s — timed out")
-    sys.exit(3)
+    return results
 
 
 # ---------------------------------------------------------------------------
 # Argument parsing
 # ---------------------------------------------------------------------------
+def resolve_file_paths(workspace: str, positional: list[str]) -> list[str]:
+    """Return absolute paths for each CSV to process."""
+    paths: list[str] = []
+    for rel in positional:
+        if not rel.strip():
+            continue
+        if workspace:
+            paths.append(os.path.join(workspace, rel))
+        else:
+            paths.append(rel)
+
+    return paths
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Upload vulnerability scan results to the Analyser tool.",
-        epilog="Environment variables ANALYSER_FILE and ANALYSER_URL "
-        "can be used in place of --file and --url respectively.",
+        epilog="Pass CSV paths as positional arguments (relative to "
+        "ANALYSER_WORKSPACE when set). ANALYSER_URL can replace --url.",
     )
 
     parser.add_argument(
-        "--file",
-        "-f",
-        default=os.environ.get("ANALYSER_FILE"),
-        help="Path to the CSV results file (env: ANALYSER_FILE)",
+        "paths",
+        nargs="*",
+        help="CSV paths relative to ANALYSER_WORKSPACE",
+    )
+
+    parser.add_argument(
+        "--workspace",
+        default=os.environ.get("ANALYSER_WORKSPACE", ""),
+        help="Results workspace root for relative paths (env: ANALYSER_WORKSPACE)",
     )
 
     parser.add_argument(
@@ -275,45 +317,36 @@ def build_parser() -> argparse.ArgumentParser:
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
-def main() -> None:
-    parser = build_parser()
-    args = parser.parse_args()
-
-    if not args.file:
-        error("Specify --file or set ANALYSER_FILE")
-        sys.exit(1)
-
-    if not args.url:
-        error("Specify --url (or set ANALYSER_URL)")
-        sys.exit(1)
-
-    # --- validate ---
-    info(f"Validating {args.file}...")
-    row_count = validate_csv(args.file)
+def process_file(
+    file_path: str,
+    base_url: str,
+    *,
+    dry_run: bool,
+    verify_ssl: bool,
+) -> dict:
+    """Validate and optionally upload a single CSV; return a per-file result dict."""
+    info(f"Validating {file_path}...")
+    row_count = validate_csv(file_path)
     if row_count == 0:
-        warn("CSV file has a header but no data rows, not uploading")
-        return
+        warn(f"CSV file has a header but no data rows, skipping: {file_path}")
+        return {
+            "status": "skipped",
+            "file": os.path.basename(file_path),
+            "records": 0,
+            "reason": "no_data_rows",
+        }
 
     info(f"Found {row_count} records, all required columns present")
 
-    if args.dry_run:
-        info(f"Dry run — {args.file} is valid ({row_count} data rows), not uploading")
-        result = {
+    if dry_run:
+        info(f"Dry run — {file_path} is valid ({row_count} data rows), not uploading")
+        return {
             "status": "dry_run",
-            "file": os.path.basename(args.file),
+            "file": os.path.basename(file_path),
             "records": row_count,
         }
-        print(json.dumps(result))
-        return
 
-    verify_ssl = not args.no_verify_ssl
-    if args.no_verify_ssl:
-        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-        warn("SSL certificate verification disabled")
-
-    # --- upload ---
-    start = time.time()
-    upload_resp = upload(args.url, args.file, verify_ssl)
+    upload_resp = upload(base_url, file_path, verify_ssl)
 
     report_id = upload_resp.get("report_id") or upload_resp.get("uuid")
     job_id = upload_resp.get("job_id")
@@ -321,28 +354,79 @@ def main() -> None:
 
     info(f"Upload accepted — report_id={report_id}  job_id={job_id}  records={total}")
 
-    # --- optionally wait ---
-    analysis_status = None
-    if args.wait and job_id:
-        analysis_status = poll_until_done(args.url, job_id, verify_ssl)
-
-    elapsed = round(time.time() - start, 1)
-    info(f"Done in {elapsed}s")
-
-    # --- final JSON to stdout ---
-    result = {
+    return {
         "status": "success",
+        "file": os.path.basename(file_path),
         "report_id": report_id,
         "job_id": job_id,
         "records": total,
-        "duration_seconds": elapsed,
-        "url": args.url,
     }
 
-    if analysis_status:
-        result["analysis"] = {
-            "status": analysis_status.get("status"),
-            "analyzers": analysis_status.get("analyzers", {}),
+
+def main() -> None:
+    parser = build_parser()
+    args = parser.parse_args()
+
+    file_paths = resolve_file_paths(args.workspace, args.paths)
+    if not file_paths:
+        error("Specify at least one CSV path")
+        sys.exit(1)
+
+    if not args.url:
+        error("Specify --url (or set ANALYSER_URL)")
+        sys.exit(1)
+
+    verify_ssl = not args.no_verify_ssl
+    if args.no_verify_ssl:
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        warn("SSL certificate verification disabled")
+
+    start = time.time()
+    uploads: list[dict] = []
+    for file_path in file_paths:
+        uploads.append(
+            process_file(
+                file_path,
+                args.url,
+                dry_run=args.dry_run,
+                verify_ssl=verify_ssl,
+            )
+        )
+
+    if args.wait and not args.dry_run:
+        job_ids = [entry["job_id"] for entry in uploads if entry.get("status") == "success" and entry.get("job_id")]
+        if job_ids:
+            deadline = time.time() + POLL_TIMEOUT_S
+            analysis_by_job = poll_jobs_until_done(args.url, job_ids, verify_ssl, deadline)
+            for entry in uploads:
+                job_id = entry.get("job_id")
+                if job_id not in analysis_by_job:
+                    continue
+                analysis_status = analysis_by_job[job_id]
+                entry["analysis"] = {
+                    "status": analysis_status.get("status"),
+                    "analyzers": analysis_status.get("analyzers", {}),
+                }
+
+    elapsed = round(time.time() - start, 1)
+    info(f"Done in {elapsed}s ({len(uploads)} file(s))")
+
+    if len(uploads) == 1:
+        result = uploads[0]
+        result["duration_seconds"] = elapsed
+        result["url"] = args.url
+    else:
+        if args.dry_run:
+            status = "dry_run"
+        elif all(u.get("status") == "skipped" for u in uploads):
+            status = "skipped"
+        else:
+            status = "success"
+        result = {
+            "status": status,
+            "uploads": uploads,
+            "duration_seconds": elapsed,
+            "url": args.url,
         }
 
     print(json.dumps(result))
