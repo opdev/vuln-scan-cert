@@ -8,9 +8,9 @@ spec:
 
     Pipelines must set analyser-url explicitly.
   params:
-    - name: results-file
-      type: string
-      description: CSV filename within the results workspace
+    - name: results-path
+      type: array
+      description: Paths to CSV files relative to the results workspace root
     - name: analyser-url
       type: string
       description: Analyser base URL
@@ -28,7 +28,7 @@ spec:
       default: "false"
   workspaces:
     - name: results
-      description: Workspace containing the CSV scan results file
+      description: Workspace containing the CSV scan results files
   stepTemplate:
     computeResources: {}
     securityContext:
@@ -42,13 +42,14 @@ spec:
     - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
       name: upload-results
       command: ["python", "/scripts/python/upload-results.py"]
+      args: ["$(params.results-path[*])"]
       volumeMounts:
         - name: python-scripts
           mountPath: /scripts/python
           readOnly: true
       env:
-        - name: ANALYSER_FILE
-          value: $(workspaces.results.path)/$(params.results-file)
+        - name: ANALYSER_WORKSPACE
+          value: $(workspaces.results.path)
         - name: ANALYSER_URL
           value: $(params.analyser-url)
         - name: ANALYSER_WAIT

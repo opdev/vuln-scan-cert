@@ -90,11 +90,9 @@ spec:
         name: upload-results
       runAfter:
         - run-image-scan
-      matrix:
-        params:
-          - name: results-file
-            value: $(tasks.run-image-scan.results.csv-file[*])
       params:
+        - name: results-path
+          value: $(tasks.run-image-scan.results.results-path[*])
         - name: analyser-url
           value: $(params.analyser-url)
         - name: wait
