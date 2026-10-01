@@ -6,7 +6,7 @@ spec:
   params:
     - name: central-id
       type: string
-      description: ID of provisionned central in ACS
+      description: ID of provisioned central in ACS
   stepTemplate:
     computeResources: {}
     securityContext:
@@ -20,6 +20,9 @@ spec:
     - name: python-scripts
       configMap:
         name: rhacs-python-scripts
+    - name: credentials
+      emptyDir:
+        medium: Memory
   steps:
     - image: registry.redhat.io/ubi8/ubi-minimal
       name: install-ocm
@@ -31,18 +34,16 @@ spec:
       workingDir: $(workspaces.binaries.path)
     - image: registry.redhat.io/ubi8/ubi-minimal
       name: ocm-login
-      results:
-        - name: ocm-token
-          type: string
-          description: OCM Token
       command: ["/scripts/shell/ocm-token.sh"]
       volumeMounts:
         - name: shell-scripts
           mountPath: /scripts/shell
           readOnly: true
+        - name: credentials
+          mountPath: /credentials
       env:
-        - name: STEP_RESULT_PATH
-          value: $(step.results.ocm-token.path)
+        - name: OCM_TOKEN_FILE
+          value: /credentials/ocm-token
         - name: CLIENT_ID
           valueFrom:
             secretKeyRef:
@@ -56,26 +57,34 @@ spec:
       workingDir: $(workspaces.binaries.path)
     - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
       name: destroy-central
-      command: ["python", "/scripts/python/destroy-central.py"]
+      command: ["/bin/sh", "-c"]
+      args:
+        - export OCM_TOKEN="$(cat "$OCM_TOKEN_FILE")"; exec python /scripts/python/destroy-central.py
       volumeMounts:
         - name: python-scripts
           mountPath: /scripts/python
           readOnly: true
+        - name: credentials
+          mountPath: /credentials
       env:
-        - name: OCM_TOKEN
-          value: $(steps.ocm-login.results.ocm-token)
+        - name: OCM_TOKEN_FILE
+          value: /credentials/ocm-token
         - name: CENTRAL_ID
           value: $(params.central-id)
     - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
       name: wait-for-central-delete
-      command: ["python", "/scripts/python/wait-for-central-delete.py"]
+      command: ["/bin/sh", "-c"]
+      args:
+        - export OCM_TOKEN="$(cat "$OCM_TOKEN_FILE")"; exec python /scripts/python/wait-for-central-delete.py
       volumeMounts:
         - name: python-scripts
           mountPath: /scripts/python
           readOnly: true
+        - name: credentials
+          mountPath: /credentials
       env:
-        - name: OCM_TOKEN
-          value: $(steps.ocm-login.results.ocm-token)
+        - name: OCM_TOKEN_FILE
+          value: /credentials/ocm-token
         - name: CENTRAL_ID
           value: $(params.central-id)
   workspaces:

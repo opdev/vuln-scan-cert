@@ -1,0 +1,29 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: cleanup-creds
+spec:
+  params:
+    - name: creds-secret-name
+      type: string
+      description: Name of the per-run Secret to delete
+  stepTemplate:
+    computeResources: {}
+    securityContext:
+      runAsNonRoot: false
+      runAsUser: 0
+  volumes:
+    - name: python-scripts
+      configMap:
+        name: rhacs-python-scripts
+  steps:
+    - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
+      name: delete-secret
+      command: ["python", "/scripts/python/delete-secret.py"]
+      volumeMounts:
+        - name: python-scripts
+          mountPath: /scripts/python
+          readOnly: true
+      env:
+        - name: CREDS_SECRET_NAME
+          value: $(params.creds-secret-name)

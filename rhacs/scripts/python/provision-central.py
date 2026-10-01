@@ -1,8 +1,18 @@
 import os
 
 import requests
+from secret_utils import write_secret
 
-headers = {"Authorization": f"Bearer {os.getenv('OCM_TOKEN')}", "Content-Type": "application/json"}
+ocm_token = os.getenv("OCM_TOKEN")
+if not ocm_token:
+    raise ValueError("OCM_TOKEN must be set")
+
+# Stash the OCM token in the per-run Secret so downstream tasks (authenticate-central) can read
+# it via secretKeyRef instead of a shared workspace file. Done first, before the long
+# provisioning work. authenticate-central later merges rox-api-token into the same Secret.
+write_secret({"ocm-token": ocm_token})
+
+headers = {"Authorization": f"Bearer {ocm_token}", "Content-Type": "application/json"}
 existing_central_id = os.getenv("EXISTING_CENTRAL_ID")
 
 if existing_central_id:

@@ -10,18 +10,6 @@ Requirements TBD
 
 https://docs.redhat.com/en/documentation/red_hat_openshift_pipelines/1.21/html/installing_and_configuring/installing-pipelines
 
-#### Increase the maximum Task result size using sidecar logs
-
-Documentation: https://tekton.dev/docs/pipelines/additional-configs/#enabling-larger-results-using-sidecar-logs
-
-```shell
-$ oc apply -f enable-log-access-to-controller/rbac.yaml
-$ oc patch cm feature-flags -n openshift-pipelines -p '{"data":{"results-from":"sidecar-logs"}}'
-$ oc patch cm feature-flags -n openshift-pipelines -p '{"data":{"max-result-size":"8192"}}'
-```
-
-This is required due to the size of the `ROX_API_TOKEN`, exceeding the default 4096 bytes.
-
 #### Enable feature flag for Enum parameters
 
 ```shell
@@ -74,9 +62,9 @@ $ oc apply -k .
 
 This is equivalent to `kustomize build . | oc apply -f -` and creates/updates:
 - Three ConfigMaps containing all shell and Python scripts
-- Eight Tekton Tasks (RHACS tasks plus the shared `upload-results` task)
+- Tekton Tasks (RHACS tasks plus the shared `upload-results` and `cleanup-creds` tasks)
 - The `rhacs` Pipeline
-- RBAC for sidecar-logs result storage
+- RBAC (`creds-secret-rbac/`) letting the pipeline ServiceAccount manage the per-run credentials Secret
 
 #### Adding or modifying scripts
 
