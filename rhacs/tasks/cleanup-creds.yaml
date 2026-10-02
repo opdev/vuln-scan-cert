@@ -1,15 +1,12 @@
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
-  name: wait-for-scanner-init
+  name: cleanup-creds
 spec:
   params:
-    - name: rox-endpoint
-      type: string
-      description: Central UI Endpoint
     - name: creds-secret-name
       type: string
-      description: Name of the per-run Secret holding the ROX API token
+      description: Name of the per-run Secret to delete
   stepTemplate:
     computeResources: {}
     securityContext:
@@ -21,17 +18,12 @@ spec:
         name: rhacs-python-scripts
   steps:
     - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
-      name: wait-for-scanner-init
-      command: ["python", "/scripts/python/wait-for-scanner-init.py"]
+      name: delete-secret
+      command: ["python", "/scripts/python/delete-secret.py"]
       volumeMounts:
         - name: python-scripts
           mountPath: /scripts/python
           readOnly: true
       env:
-        - name: ROX_ENDPOINT
-          value: $(params.rox-endpoint)
-        - name: ROX_API_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: $(params.creds-secret-name)
-              key: "rox-api-token"
+        - name: CREDS_SECRET_NAME
+          value: $(params.creds-secret-name)

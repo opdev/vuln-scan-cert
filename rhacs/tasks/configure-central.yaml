@@ -10,8 +10,9 @@ spec:
     - name: rox-endpoint
       type: string
       description: Central UI Endpoint
-    - name: rox-api-token
+    - name: creds-secret-name
       type: string
+      description: Name of the per-run Secret holding the ROX API token
   stepTemplate:
     computeResources: {}
     securityContext:
@@ -33,7 +34,10 @@ spec:
         - name: ROX_ENDPOINT
           value: $(params.rox-endpoint)
         - name: ROX_API_TOKEN
-          value: $(params.rox-api-token)
+          valueFrom:
+            secretKeyRef:
+              name: $(params.creds-secret-name)
+              key: "rox-api-token"
         - name: REGISTRY_REDHAT_USERNAME
           valueFrom:
             secretKeyRef:

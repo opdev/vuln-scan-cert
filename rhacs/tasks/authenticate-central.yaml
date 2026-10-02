@@ -11,13 +11,15 @@ spec:
     - name: rox-endpoint
       type: string
       description: Central UI Endpoint
-    - name: ocm-token
+    - name: creds-secret-name
       type: string
-      description: Token generated when logging into OCM using Service Account credentials
-  results:
-    - name: rox-api-token
+      description: Name of the per-run Secret to store the ROX API token in
+    - name: pipelinerun-name
       type: string
-      description: OIDC Token for ACS authentication, obtained after exchanching the OCM token
+      description: PipelineRun name, used as the Secret's ownerReference
+    - name: pipelinerun-uid
+      type: string
+      description: PipelineRun UID, used as the Secret's ownerReference
   stepTemplate:
     computeResources: {}
     securityContext:
@@ -31,6 +33,9 @@ spec:
     - name: python-scripts
       configMap:
         name: rhacs-python-scripts
+    - name: credentials
+      emptyDir:
+        medium: Memory
   steps:
     - image: registry.redhat.io/ubi8/ubi-minimal
       name: install-roxctl
@@ -56,34 +61,42 @@ spec:
       workingDir: $(workspaces.binaries.path)
     - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
       name: authenticate-central
-      results:
-        - name: rox-api-token
-          type: string
-          description: OIDC Token for ACS authentication, obtained after exchanching the OCM token
-      command: ["python", "/scripts/python/authenticate-central.py"]
+      command: ["/bin/sh", "-c"]
+      args:
+        - export OCM_TOKEN="$(cat "$OCM_TOKEN_FILE")"; exec python /scripts/python/authenticate-central.py
       volumeMounts:
         - name: python-scripts
           mountPath: /scripts/python
           readOnly: true
+        - name: credentials
+          mountPath: /credentials
       env:
-        - name: OCM_TOKEN
-          value: $(params.ocm-token)
+        - name: OCM_TOKEN_FILE
+          value: $(workspaces.binaries.path)/ocm-token
         - name: ROX_ENDPOINT
           value: $(params.rox-endpoint)
-        - name: STEP_RESULT_PATH
-          value: $(step.results.rox-api-token.path)
-        - name: TASK_RESULT_PATH
-          value: $(results.rox-api-token.path)
+        - name: ROX_API_TOKEN_FILE
+          value: /credentials/rox-api-token
+        - name: CREDS_SECRET_NAME
+          value: $(params.creds-secret-name)
+        - name: PIPELINERUN_NAME
+          value: $(params.pipelinerun-name)
+        - name: PIPELINERUN_UID
+          value: $(params.pipelinerun-uid)
     - image: registry.redhat.io/ubi8/ubi-minimal
       name: test-rox-api-token
-      command: ["/scripts/shell/test-rox-api-token.sh"]
+      command: ["/bin/sh", "-c"]
+      args:
+        - export ROX_API_TOKEN="$(cat "$ROX_API_TOKEN_FILE")"; exec /scripts/shell/test-rox-api-token.sh
       volumeMounts:
         - name: shell-scripts
           mountPath: /scripts/shell
           readOnly: true
+        - name: credentials
+          mountPath: /credentials
       env:
-        - name: ROX_API_TOKEN
-          value: $(steps.authenticate-central.results.rox-api-token)
+        - name: ROX_API_TOKEN_FILE
+          value: /credentials/rox-api-token
         - name: ROX_ENDPOINT
           value: $(params.rox-endpoint)
       workingDir: $(workspaces.binaries.path)

@@ -20,8 +20,9 @@ spec:
   params:
     - name: rox-endpoint
       type: string
-    - name: rox-api-token
+    - name: creds-secret-name
       type: string
+      description: Name of the per-run Secret holding the ROX API token
     - name: image
       type: string
       description: |
@@ -71,7 +72,10 @@ spec:
         - name: IMAGE
           value: $(params.image)
         - name: ROX_API_TOKEN
-          value: $(params.rox-api-token)
+          valueFrom:
+            secretKeyRef:
+              name: $(params.creds-secret-name)
+              key: "rox-api-token"
         - name: RESULTS_PATH
           value: $(workspaces.results.path)
     - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest

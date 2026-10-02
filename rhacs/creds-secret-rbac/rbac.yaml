@@ -1,0 +1,22 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: rhacs-creds-secret-manager
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create", "get", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: rhacs-creds-secret-manager-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: rhacs-creds-secret-manager
+subjects:
+  # Default ServiceAccount used by OpenShift Pipelines PipelineRuns. Adjust the name
+  # if the pipeline runs under a different ServiceAccount.
+  - kind: ServiceAccount
+    name: pipeline

@@ -27,9 +27,6 @@ spec:
     - name: rox-endpoint
       type: string
       description: Central UI Endpoint
-    - name: ocm-token
-      type: string
-      description: Token generated when logging into OCM using Service Account credentials
   stepTemplate:
     computeResources: {}
     securityContext:
@@ -54,10 +51,6 @@ spec:
       workingDir: $(workspaces.binaries.path)
     - image: registry.redhat.io/ubi8/ubi-minimal
       name: ocm-login
-      results:
-        - name: ocm-token
-          type: string
-          description: Token generated when logging into OCM using Service Account credentials
       command: ["/scripts/shell/ocm-token.sh"]
       volumeMounts:
         - name: shell-scripts
@@ -74,10 +67,8 @@ spec:
             secretKeyRef:
               name: $(params.service-account-creds-secret)
               key: "client-secret"
-        - name: STEP_RESULT_PATH
-          value: $(step.results.ocm-token.path)
-        - name: TASK_RESULT_PATH
-          value: $(results.ocm-token.path)
+        - name: OCM_TOKEN_FILE
+          value: $(workspaces.binaries.path)/ocm-token
       workingDir: $(workspaces.binaries.path)
     - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
       name: provision-central
@@ -85,14 +76,16 @@ spec:
         - name: central-id
           type: string
           description: ID of provisionned central in ACS CS
-      command: ["python", "/scripts/python/provision-central.py"]
+      command: ["/bin/sh", "-c"]
+      args:
+        - export OCM_TOKEN="$(cat "$OCM_TOKEN_FILE")"; exec python /scripts/python/provision-central.py
       volumeMounts:
         - name: python-scripts
           mountPath: /scripts/python
           readOnly: true
       env:
-        - name: OCM_TOKEN
-          value: $(steps.ocm-login.results.ocm-token)
+        - name: OCM_TOKEN_FILE
+          value: $(workspaces.binaries.path)/ocm-token
         - name: PIPELINERUN_UID
           value: $(params.pipelinerun-uid)
         - name: CLOUD_ACCOUNT_ID
@@ -107,14 +100,16 @@ spec:
           value: $(results.central-id.path)
     - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
       name: wait-for-central-ready
-      command: ["python", "/scripts/python/wait-for-central-ready.py"]
+      command: ["/bin/sh", "-c"]
+      args:
+        - export OCM_TOKEN="$(cat "$OCM_TOKEN_FILE")"; exec python /scripts/python/wait-for-central-ready.py
       volumeMounts:
         - name: python-scripts
           mountPath: /scripts/python
           readOnly: true
       env:
-        - name: OCM_TOKEN
-          value: $(steps.ocm-login.results.ocm-token)
+        - name: OCM_TOKEN_FILE
+          value: $(workspaces.binaries.path)/ocm-token
         - name: CENTRAL_ID
           value: $(steps.provision-central.results.central-id)
         - name: ROX_ENDPOINT_PATH

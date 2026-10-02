@@ -10,17 +10,24 @@ Requirements TBD
 
 https://docs.redhat.com/en/documentation/red_hat_openshift_pipelines/1.21/html/installing_and_configuring/installing-pipelines
 
-#### Increase the maximum Task result size using sidecar logs
+#### Task result size / sidecar logs — no longer required
 
-Documentation: https://tekton.dev/docs/pipelines/additional-configs/#enabling-larger-results-using-sidecar-logs
+The `ROX_API_TOKEN` (which exceeds the default 4096-byte result limit) is **no longer passed
+as a Tekton result**. It is stored in a short-lived per-PipelineRun Kubernetes Secret and read
+by downstream tasks via `secretKeyRef`. This means:
+
+- The `results-from: sidecar-logs` feature flag is **not needed**. Enabling it causes the
+  `sidecar-tekton-log-results` sidecar to echo every Task result to the pod logs in plaintext,
+  which previously leaked the tokens (see `THREAT_MODEL.md` T-03). Keep it at the default.
+- If a cluster was previously configured for sidecar-logs, revert it:
 
 ```shell
-$ oc apply -f enable-log-access-to-controller/rbac.yaml
-$ oc patch cm feature-flags -n openshift-pipelines -p '{"data":{"results-from":"sidecar-logs"}}'
-$ oc patch cm feature-flags -n openshift-pipelines -p '{"data":{"max-result-size":"8192"}}'
+$ oc patch cm feature-flags -n openshift-pipelines -p '{"data":{"results-from":"termination-message"}}'
+$ oc patch cm feature-flags -n openshift-pipelines -p '{"data":{"max-result-size":"4096"}}'
 ```
 
-This is required due to the size of the `ROX_API_TOKEN`, exceeding the default 4096 bytes.
+The `enable-log-access-to-controller/rbac.yaml` grant is only needed for sidecar-logs and can
+be removed once it is disabled.
 
 #### Enable feature flag for Enum parameters
 
@@ -74,9 +81,10 @@ $ oc apply -k .
 
 This is equivalent to `kustomize build . | oc apply -f -` and creates/updates:
 - Three ConfigMaps containing all shell and Python scripts
-- Eight Tekton Tasks (RHACS tasks plus the shared `upload-results` task)
+- Tekton Tasks (RHACS tasks plus the shared `upload-results` and `cleanup-creds` tasks)
 - The `rhacs` Pipeline
-- RBAC for sidecar-logs result storage
+- RBAC (`creds-secret-rbac/`) letting the pipeline ServiceAccount manage the per-run
+  credentials Secret; and the (now-optional) sidecar-logs log-access RBAC
 
 #### Adding or modifying scripts
 

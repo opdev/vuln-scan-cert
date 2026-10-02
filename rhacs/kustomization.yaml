@@ -8,8 +8,10 @@ resources:
   - tasks/configure-central.yaml
   - tasks/wait-for-scanner-init.yaml
   - tasks/rhacs-image-scan.yaml
+  - tasks/cleanup-creds.yaml
   - pipeline/rhacs.yaml
   - enable-log-access-to-controller/rbac.yaml
+  - creds-secret-rbac/rbac.yaml
 generatorOptions:
   disableNameSuffixHash: true
 configMapGenerator:
@@ -25,6 +27,7 @@ configMapGenerator:
     files:
       - scripts/python/authenticate-central.py
       - scripts/python/configure-central.py
+      - scripts/python/delete-secret.py
       - scripts/python/destroy-central.py
       - scripts/python/provision-central.py
       - scripts/python/wait-for-central-delete.py
