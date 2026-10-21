@@ -100,33 +100,42 @@ def main():
     try:
         image = os.environ.get("IMAGE", "")
         results_path = os.environ.get("RESULTS_PATH", "/workspace/results")
+        partner_name = os.environ.get("PARTNER_NAME", "RedHat")
+        scanner_name = os.environ.get("SCANNER_NAME", "RHACS")
+        scanner_version = os.environ.get("SCANNER_VERSION", "4.9.2")
 
-        image_safe = re.sub(r".*/", "", image)
-        image_safe = re.sub(r"[^a-zA-Z0-9._-]", "-", image_safe)
-        image_safe = re.sub(r"-+", "-", image_safe)
-        image_safe = image_safe.strip("-")
-
-        json_file = f"{results_path}/scan-results-{image_safe}.json"
-        csv_file = f"{results_path}/scan-results-{image_safe}.csv"
-
+        # Split image into name and tag
         if ":" in image:
-            container_name, container_tag = image.rsplit(":", 1)
+            image_name, image_tag = image.rsplit(":", 1)
         else:
-            container_name = image
-            container_tag = "latest"
+            image_name = image
+            image_tag = "latest"
 
-        if "/" in container_name:
-            container_name = container_name.split("/")[-1]
+        # Remove registry prefix
+        if "/" in image_name:
+            image_name = image_name.split("/")[-1]
+
+        # Sanitize for filename
+        image_name_safe = re.sub(r"[^a-zA-Z0-9._-]", "-", image_name)
+        image_name_safe = re.sub(r"-+", "-", image_name_safe).strip("-")
+        image_tag_safe = re.sub(r"[^a-zA-Z0-9._-]", "-", image_tag)
+        image_tag_safe = re.sub(r"-+", "-", image_tag_safe).strip("-")
+
+        # Build filename: <partnerName>_<scannerName>_<scannerVersion>_<image>_<tag>
+        base_filename = f"{partner_name}_{scanner_name}_{scanner_version}_{image_name_safe}_{image_tag_safe}"
+        json_file = f"{results_path}/{base_filename}.json"
+        csv_file = f"{results_path}/{base_filename}.csv"
 
         print(f"Processing image: {image}")
-        print(f"Container: {container_name}:{container_tag}")
+        print(f"Container: {image_name}:{image_tag}")
+        print(f"Output files: {base_filename}.{{json,csv}}")
 
         if not os.path.exists(json_file):
             print(f"ERROR: JSON file not found: {json_file}")
             sys.exit(1)
 
         scan_data = load_json_data(json_file)
-        csv_data = extract_vulnerability_data(scan_data, container_name, container_tag)
+        csv_data = extract_vulnerability_data(scan_data, image_name, image_tag)
         write_csv_data(csv_data, csv_file)
 
         csv_basename = os.path.basename(csv_file)

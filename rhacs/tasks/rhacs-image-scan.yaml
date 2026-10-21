@@ -34,6 +34,18 @@ spec:
         When set to `"true"`, skip verifying the TLS certs of the Central
         endpoint. Defaults to `"false"`.
       default: "false"
+    - name: partner-name
+      type: string
+      description: Partner name for result file naming
+      default: "RedHat"
+    - name: scanner-name
+      type: string
+      description: Scanner name for result file naming
+      default: "RHACS"
+    - name: scanner-version
+      type: string
+      description: Scanner version for result file naming
+      default: "4.9.2"
   workspaces:
     - name: results
       description: |
@@ -78,6 +90,12 @@ spec:
               key: "rox-api-token"
         - name: RESULTS_PATH
           value: $(workspaces.results.path)
+        - name: PARTNER_NAME
+          value: $(params.partner-name)
+        - name: SCANNER_NAME
+          value: $(params.scanner-name)
+        - name: SCANNER_VERSION
+          value: $(params.scanner-version)
     - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
       name: json-to-csv-conversion
       command: ["python", "/scripts/python/json-to-csv.py"]
@@ -92,3 +110,9 @@ spec:
           value: $(workspaces.results.path)
         - name: TASK_RESULT_PATH
           value: $(results.results-path.path)
+        - name: PARTNER_NAME
+          value: $(params.partner-name)
+        - name: SCANNER_NAME
+          value: $(params.scanner-name)
+        - name: SCANNER_VERSION
+          value: $(params.scanner-version)

@@ -90,6 +90,12 @@ spec:
           value: rhacs-creds-$(context.pipelineRun.uid)
         - name: insecure-skip-tls-verify
           value: "true"
+        - name: partner-name
+          value: $(params.partner-name)
+        - name: scanner-name
+          value: $(params.scanner-name)
+        - name: scanner-version
+          value: $(params.roxctl-version)
       workspaces:
         - name: results
           workspace: scan-results
@@ -115,6 +121,14 @@ spec:
         - name: results
           workspace: scan-results
   params:
+    - name: partner-name
+      type: string
+      description: Partner name for result file naming
+      default: "RedHat"
+    - name: scanner-name
+      type: string
+      description: Scanner name for result file naming
+      default: "RHACS"
     - name: roxctl-version
       type: string
       description: Version of Roxctl to use
