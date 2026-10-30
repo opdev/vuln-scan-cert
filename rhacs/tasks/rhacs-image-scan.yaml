@@ -50,6 +50,9 @@ spec:
     - name: results
       description: |
         Workspace to store scan results. JSON and CSV files will be written here.
+    - name: binaries
+      description: |
+        Workspace containing the roxctl binary (pre-installed by authenticate-central).
   stepTemplate:
     computeResources: {}
     securityContext:
@@ -72,6 +75,7 @@ spec:
     - image: image-registry.openshift-image-registry.svc:5000/$(context.taskRun.namespace)/python3-with-requests:latest
       name: rox-image-scan
       command: ["bash", "/scripts/shell/scan-image.sh"]
+      workingDir: $(workspaces.binaries.path)
       volumeMounts:
         - name: shell-scripts
           mountPath: /scripts/shell
