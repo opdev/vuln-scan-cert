@@ -26,31 +26,15 @@ IMAGE_TAG_SAFE=$(echo "${IMAGE_TAG}" | sed 's|[^a-zA-Z0-9._-]|-|g' | sed 's|--*|
 echo "Image: ${IMAGE_NAME}:${IMAGE_TAG}"
 echo "Safe filename: ${PARTNER_NAME}_${SCANNER_NAME}_${SCANNER_VERSION}_${IMAGE_NAME_SAFE}_${IMAGE_TAG_SAFE}"
 
-# Download roxctl binary from the working URL
-echo "Downloading roxctl binary..."
-ROXCTL_URL="https://mirror.openshift.com/pub/rhacs/assets/4.4.2/bin/Linux/roxctl"
-
-if curl -sL -f -o /tmp/roxctl "$ROXCTL_URL"; then
-    chmod +x /tmp/roxctl
-    if /tmp/roxctl version &>/dev/null; then
-        ROXCTL_CMD="/tmp/roxctl"
-        echo "Successfully downloaded roxctl from $ROXCTL_URL"
-        /tmp/roxctl version
-    else
-        echo "ERROR: Downloaded file is not a valid roxctl binary"
-        exit 1
-    fi
-else
-    echo "ERROR: Failed to download roxctl from $ROXCTL_URL"
-    exit 1
-fi
+# Use roxctl binary from the binaries workspace (mounted by Tekton task)
+echo "roxctl version:"
+./roxctl version
 
 # Perform the image scan and save results to JSON file
 JSON_OUTPUT="${RESULTS_PATH}/${PARTNER_NAME}_${SCANNER_NAME}_${SCANNER_VERSION}_${IMAGE_NAME_SAFE}_${IMAGE_TAG_SAFE}.json"
 
 echo "Running scan command..."
-# Run the scan with JSON output
-$ROXCTL_CMD image scan \
+./roxctl image scan \
   --insecure-skip-tls-verify=${INSECURE} \
   --output=json \
   --image="${IMAGE}" > "${JSON_OUTPUT}"

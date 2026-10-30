@@ -38,6 +38,14 @@ spec:
     securityContext:
       runAsNonRoot: false
       runAsUser: 0
+      # Pin a fixed SELinux MCS level so every task that mounts the shared
+      # `bin` RWO PVC (provision/authenticate/scan/destroy) runs with the
+      # same label. Without this, OpenShift's MustRunAs SCC assigns a unique
+      # MCS level per pod; concurrent matrix scan pods then race to relabel
+      # the PVC and lock each other out of roxctl (exit 126 / "Permission
+      # denied"). Keep this value identical across all four tasks.
+      seLinuxOptions:
+        level: "s0:c6,c5"
   volumes:
     - name: shell-scripts
       configMap:

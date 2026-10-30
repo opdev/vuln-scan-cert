@@ -100,6 +100,8 @@ spec:
         - name: results
           workspace: scan-results
           subPath: $(params.image)
+        - name: binaries
+          workspace: bin
     - name: upload-results
       taskRef:
         kind: Task
