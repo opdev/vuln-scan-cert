@@ -55,7 +55,7 @@ spec:
               name: rh-openid-credentials
               key: "client-secret"
       workingDir: $(workspaces.binaries.path)
-    - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
+    - image: image-registry.openshift-image-registry.svc:5000/$(context.taskRun.namespace)/python3-with-requests:latest
       name: destroy-central
       command: ["/bin/sh", "-c"]
       args:
@@ -71,7 +71,7 @@ spec:
           value: /credentials/ocm-token
         - name: CENTRAL_ID
           value: $(params.central-id)
-    - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
+    - image: image-registry.openshift-image-registry.svc:5000/$(context.taskRun.namespace)/python3-with-requests:latest
       name: wait-for-central-delete
       command: ["/bin/sh", "-c"]
       args:

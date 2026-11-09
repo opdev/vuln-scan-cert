@@ -18,6 +18,27 @@ $ oc patch cm feature-flags -n openshift-pipelines -p '{"data":{"enable-param-en
 
 This allows us to perform input validation using a list of authorized values.
 
+### Create a dedicated namespace
+
+All resources for the pipeline — Tasks, Pipeline, RBAC, Secrets, container
+images, and PipelineRuns — live in one dedicated, **non-system** namespace:
+
+```shell
+$ export NAMESPACE=rhacs-cert
+$ oc new-project "$NAMESPACE"
+```
+
+> **Do not use a system namespace** (`default`, `kube-system`, `kube-public`,
+> `kube-node-lease`, `openshift`). OpenShift SCC admission does not assign
+> SELinux labels to pods in these namespaces, so the container runtime gives
+> every pod a *random* SELinux MCS label and relabels all mounted volumes with
+> it at start-up. When TaskRuns run concurrently and share a workspace
+> PersistentVolumeClaim, the pods race to relabel the shared volume and the
+> losing pods lose access to files on it — typically failing with `Permission
+> denied` (exit code 126). In a regular namespace, SCC admission assigns the
+> same namespace-wide MCS label to every pod, so relabeling shared workspaces
+> is a no-op and concurrent TaskRuns cannot lock each other out.
+
 ### Red Hat SSO Service Account
 
 - Follow this link to create a Red Hat Service Account: https://console.redhat.com/iam/service-accounts/
@@ -28,7 +49,7 @@ $ export CLIENT_SECRET=<my-client-secret>
 ```
 - Create Kubernetes Secret
 ```shell
-$ envsubst < rh-openid-credentials/rh-openid-credentials.template.yaml | oc apply -f -
+$ envsubst < rh-openid-credentials/rh-openid-credentials.template.yaml | oc apply -n "$NAMESPACE" -f -
 ```
 
 ### Service Account for registry.redhat.io
@@ -42,7 +63,7 @@ $ export REGISTRY_REDHAT_PASSWORD=<my_service_account_token>
 ```
 - Create Kubernetes Secret
 ```shell
-$ envsubst < registry-redhat-credentials/registry-redhat-credentials.template.yaml | oc apply -f -
+$ envsubst < registry-redhat-credentials/registry-redhat-credentials.template.yaml | oc apply -n "$NAMESPACE" -f -
 ```
 
 ### Apply RHACS Tasks, Common Tasks, and RHACS Pipeline definitions
@@ -57,7 +78,7 @@ ConfigMaps (`rhacs-shell-scripts`, `rhacs-python-scripts`) by the
 Deploy everything in one command:
 
 ```shell
-$ oc apply -k .
+$ oc apply -k . -n "$NAMESPACE"
 ```
 
 This is equivalent to `kustomize build . | oc apply -f -` and creates/updates:
@@ -71,7 +92,7 @@ This is equivalent to `kustomize build . | oc apply -f -` and creates/updates:
 1. Edit the script file under `scripts/shell/` or `scripts/python/`
 2. If adding a new script, add its path to the corresponding `configMapGenerator`
    entry in `kustomization.yaml`
-3. Re-apply: `oc apply -k .`
+3. Re-apply: `oc apply -k . -n "$NAMESPACE"`
 
 The scripts are the single source of truth — there are no separate ConfigMap
 YAML manifests to keep in sync. Kustomize generates them at apply time.
@@ -82,12 +103,12 @@ YAML manifests to keep in sync. Kustomize generates them at apply time.
 
 
 ```shell
-$ oc new-build --name python3-with-requests --binary --strategy docker
-$ oc patch bc/python3-with-requests -p '{"spec":{"strategy":{"dockerStrategy":{"dockerfilePath":"Containerfile"}}}}'
-$ oc start-build python3-with-requests --from-dir=./python-with-requests --follow
+$ oc new-build --name python3-with-requests --binary --strategy docker -n "$NAMESPACE"
+$ oc patch bc/python3-with-requests -n "$NAMESPACE" -p '{"spec":{"strategy":{"dockerStrategy":{"dockerfilePath":"Containerfile"}}}}'
+$ oc start-build python3-with-requests --from-dir=./python-with-requests --follow -n "$NAMESPACE"
 ```
 
-The image is now available in the internal registry `image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest`.
+The image is now available in the internal registry `image-registry.openshift-image-registry.svc:5000/$NAMESPACE/python3-with-requests:latest`.
 
 It is used in steps that run Python code and require the `requests` module.
 
@@ -102,7 +123,7 @@ $ export CLOUD_ACCOUNT_ID="REPLACE_ME"
 $ export IMAGES="registry.redhat.io/rhel9/python-312:1-1762157847,registry.redhat.io/openshift4/ose-console-rhel9:v4.18.0-202512031513.p2.ga29310a.assembly.stream.el9"
 $ export ANALYSER_URL="x.x.x.x"
 $ tkn pipeline start rhacs \
-  -n default \
+  -n "$NAMESPACE" \
   --param images="$IMAGES" \
   --param service-account-creds-secret=rh-openid-credentials \
   --param registry-redhat-creds-secret=registry-redhat-credentials \
@@ -131,7 +152,7 @@ apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
   name: my-rhacs-run
-  namespace: default
+  namespace: rhacs-cert  # the dedicated non-system namespace created above
 spec:
   pipelineRef:
     name: rhacs
@@ -181,8 +202,8 @@ spec:
 Apply and view logs:
 
 ```bash
-oc apply -f run-rhacs-pr.yaml -n default
-tkn pipelinerun logs -f rhacs-cli -n default
+oc apply -f run-rhacs-pr.yaml -n "$NAMESPACE"
+tkn pipelinerun logs -f my-rhacs-run -n "$NAMESPACE"
 ```
 
 ## Accessing Scan Results
@@ -200,10 +221,10 @@ To access the results after a pipeline run:
 
 ```bash
 # Find the scan-results PVC
-oc get pvc | grep scan-results
+oc get pvc -n "$NAMESPACE" | grep scan-results
 
 # Create a temporary pod to access the files
-oc run results-viewer --image=registry.access.redhat.com/ubi9/ubi-minimal --rm -it --restart=Never \
+oc run results-viewer -n "$NAMESPACE" --image=registry.access.redhat.com/ubi9/ubi-minimal --rm -it --restart=Never \
   --overrides='{"spec":{"containers":[{"name":"results-viewer","image":"registry.access.redhat.com/ubi9/ubi-minimal","command":["sleep","3600"],"volumeMounts":[{"mountPath":"/results","name":"scan-results"}]}],"volumes":[{"name":"scan-results","persistentVolumeClaim":{"claimName":"<pvc-name>"}}]}}'
 
 # Inside the pod, view the results

@@ -48,7 +48,7 @@ runtime_cli: [oc, tkn, kubectl, kustomize]     # CLI tools for runtime
 - **Add/modify a script**: edit the file under `scripts/{shell,python}/`. If it is a
   *new* file, also add its path to the matching `configMapGenerator` entry in
   `kustomization.yaml`. Preview changes with `kubectl kustomize rhacs/`. A human must
-  run `oc apply -k rhacs/` after approval.
+  run `oc apply -k rhacs/ -n <pipeline-namespace>` after approval.
 - **Change a Task**: edit `rhacs/tasks/<name>.yaml`. Tasks mount the ConfigMaps and run
   scripts via `command:`.
 - Prefer the smallest diff that routes through the shared script/task — don't patch one
@@ -69,6 +69,13 @@ make format        # auto-fix ruff + yamlfmt (run before committing)
 
 ## Conventions & boundaries
 
+- **The pipeline lives in a dedicated, non-system namespace** (never `default`, `kube-*`,
+  or `openshift`): OpenShift SCC admission does not assign SELinux labels to pods in
+  system namespaces, so every pod gets a random MCS label from the container runtime and
+  concurrently-running TaskRuns sharing a workspace PVC race to relabel it (symptom:
+  `Permission denied`, exit 126). The `python3-with-requests` image must be built in that
+  same namespace — Tasks reference it via `$(context.taskRun.namespace)`. See
+  `rhacs/README.md` ("Create a dedicated namespace").
 - **Secrets never go in code, logs, or committed files.** Credentials come from
   Kubernetes Secrets / env vars only. `*.template.yaml` files hold placeholders, not values.
 - Do not weaken TLS/download verification. Downloaded binaries (`roxctl`, `ocm`) must be

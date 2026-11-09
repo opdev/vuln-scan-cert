@@ -16,7 +16,7 @@ Scripts live as standalone files under `scripts/` and are bundled into the
 `kustomization.yaml`.
 
 ```shell
-oc apply -k common/
+oc apply -k common/ -n "$NAMESPACE"
 ```
 
 ## Adding or modifying scripts
@@ -24,4 +24,4 @@ oc apply -k common/
 1. Edit the script file under `scripts/python/`
 2. If adding a new script, add its path to the `configMapGenerator` entry in
    `kustomization.yaml`
-3. Re-apply: `oc apply -k common/`
+3. Re-apply: `oc apply -k common/ -n "$NAMESPACE"`

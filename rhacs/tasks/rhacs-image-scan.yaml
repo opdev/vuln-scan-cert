@@ -69,7 +69,7 @@ spec:
       configMap:
         name: rhacs-python-scripts
   steps:
-    - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
+    - image: image-registry.openshift-image-registry.svc:5000/$(context.taskRun.namespace)/python3-with-requests:latest
       name: rox-image-scan
       command: ["bash", "/scripts/shell/scan-image.sh"]
       volumeMounts:
@@ -96,7 +96,7 @@ spec:
           value: $(params.scanner-name)
         - name: SCANNER_VERSION
           value: $(params.scanner-version)
-    - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
+    - image: image-registry.openshift-image-registry.svc:5000/$(context.taskRun.namespace)/python3-with-requests:latest
       name: json-to-csv-conversion
       command: ["python", "/scripts/python/json-to-csv.py"]
       volumeMounts:

@@ -39,7 +39,7 @@ spec:
       configMap:
         name: common-python-scripts
   steps:
-    - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
+    - image: image-registry.openshift-image-registry.svc:5000/$(context.taskRun.namespace)/python3-with-requests:latest
       name: upload-results
       command: ["python", "/scripts/python/upload-results.py"]
       args: ["$(params.results-path[*])"]

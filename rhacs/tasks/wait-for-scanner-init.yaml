@@ -24,7 +24,7 @@ spec:
       configMap:
         name: rhacs-python-scripts
   steps:
-    - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
+    - image: image-registry.openshift-image-registry.svc:5000/$(context.taskRun.namespace)/python3-with-requests:latest
       name: wait-for-scanner-init
       command: ["python", "/scripts/python/wait-for-scanner-init.py"]
       volumeMounts:
@@ -39,7 +39,7 @@ spec:
             secretKeyRef:
               name: $(params.creds-secret-name)
               key: "rox-api-token"
-    - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
+    - image: image-registry.openshift-image-registry.svc:5000/$(context.taskRun.namespace)/python3-with-requests:latest
       name: get-rhacs-version
       command: ["python", "/scripts/python/get-rhacs-version.py"]
       volumeMounts:
