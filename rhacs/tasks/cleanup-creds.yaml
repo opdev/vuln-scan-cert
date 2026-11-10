@@ -17,7 +17,7 @@ spec:
       configMap:
         name: rhacs-python-scripts
   steps:
-    - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
+    - image: image-registry.openshift-image-registry.svc:5000/$(context.taskRun.namespace)/python3-with-requests:latest
       name: delete-secret
       command: ["python", "/scripts/python/delete-secret.py"]
       volumeMounts:

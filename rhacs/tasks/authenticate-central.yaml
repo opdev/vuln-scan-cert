@@ -59,7 +59,7 @@ spec:
           mountPath: /scripts/shell
           readOnly: true
       workingDir: $(workspaces.binaries.path)
-    - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
+    - image: image-registry.openshift-image-registry.svc:5000/$(context.taskRun.namespace)/python3-with-requests:latest
       name: authenticate-central
       command: ["python", "/scripts/python/authenticate-central.py"]
       volumeMounts:

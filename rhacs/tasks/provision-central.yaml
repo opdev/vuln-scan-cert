@@ -81,7 +81,7 @@ spec:
         - name: OCM_TOKEN_FILE
           value: /credentials/ocm-token
       workingDir: $(workspaces.binaries.path)
-    - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
+    - image: image-registry.openshift-image-registry.svc:5000/$(context.taskRun.namespace)/python3-with-requests:latest
       name: provision-central
       results:
         - name: central-id
@@ -115,7 +115,7 @@ spec:
           value: $(step.results.central-id.path)
         - name: TASK_RESULT_PATH
           value: $(results.central-id.path)
-    - image: image-registry.openshift-image-registry.svc:5000/default/python3-with-requests:latest
+    - image: image-registry.openshift-image-registry.svc:5000/$(context.taskRun.namespace)/python3-with-requests:latest
       name: wait-for-central-ready
       command: ["/bin/sh", "-c"]
       args:
